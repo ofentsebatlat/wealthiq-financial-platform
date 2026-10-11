@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Investment Center – WealthIQ{% endblock %}
+{% block page_title %}Investment Marketplace{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 2.5rem; background: linear-gradient(135deg, hsla(var(--primary), 0.1), transparent); border-color: hsla(var(--primary), 0.25);">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div style="font-size: 3rem; color: hsl(var(--primary)); text-shadow: var(--shadow-glow);">
+            <i class="fa-solid fa-chart-line-up"></i>
+        </div>
+        <div>
+            <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Grow Your Wealth IQ</h2>
+            <p style="color: hsl(var(--text-secondary)); max-width: 700px; font-size: 0.95rem;">
+                Browse available investment products curated specifically to help Capitec clients expand their wealth. 
+                Select a product to launch the simulation model and calculate projections directly.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Category Sections -->
+{% for type_key, type_label in object_list_types %}
+    <!-- Defined dynamically in static wrapper below -->
+{% endfor %}
+
+<div class="section-header">
+    <h3><i class="fa-solid fa-layer-group" style="color: hsl(var(--primary))"></i> Unit Trusts</h3>
+</div>
+<div class="investment-grid">
+    {% for product in grouped.unit_trust %}
+    <div class="product-card">
+        <span class="badge-risk {{ product.risk_rating }}">{{ product.risk_rating }} risk</span>
+        <h4 class="product-name">{{ product.name }}</h4>
+        
+        <div class="product-return">
+            <div class="return-label">Target Return Rate</div>
+            <div class="return-val">{{ product.expected_annual_return }}% <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">p.a.</span></div>
+        </div>
+
+        <p class="product-desc">{{ product.description }}</p>
+
+        <div class="product-meta">
+            <div>
+                <div class="meta-label">Min Investment</div>
+                <div class="meta-val">R{{ product.minimum_investment|floatformat:0 }}</div>
+            </div>
+            <a href="{% url 'simulate' product.id %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-calculator"></i> Simulate
+            </a>
+        </div>
+    </div>
+    {% empty %}
+    <p style="color: hsl(var(--text-muted));">No Unit Trust products available.</p>
+    {% endfor %}
+</div>
+
+<div class="section-header">
+    <h3><i class="fa-solid fa-lock" style="color: #fbbf24"></i> Fixed Deposits</h3>
+</div>
+<div class="investment-grid">
+    {% for product in grouped.fixed_deposit %}
+    <div class="product-card">
+        <span class="badge-risk {{ product.risk_rating }}">{{ product.risk_rating }} risk</span>
+        <h4 class="product-name">{{ product.name }}</h4>
+        
+        <div class="product-return">
+            <div class="return-label">Fixed Annual Return</div>
+            <div class="return-val">{{ product.expected_annual_return }}% <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">p.a.</span></div>
+        </div>
+
+        <p class="product-desc">{{ product.description }}</p>
+
+        <div class="product-meta">
+            <div>
+                <div class="meta-label">Min Investment</div>
+                <div class="meta-val">R{{ product.minimum_investment|floatformat:0 }}</div>
+            </div>
+            <a href="{% url 'simulate' product.id %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-calculator"></i> Simulate
+            </a>
+        </div>
+    </div>
+    {% empty %}
+    <p style="color: hsl(var(--text-muted));">No Fixed Deposit products available.</p>
+    {% endfor %}
+</div>
+
+<div class="section-header">
+    <h3><i class="fa-solid fa-building-columns" style="color: #60a5fa"></i> Money Market Accounts</h3>
+</div>
+<div class="investment-grid">
+    {% for product in grouped.money_market %}
+    <div class="product-card">
+        <span class="badge-risk {{ product.risk_rating }}">{{ product.risk_rating }} risk</span>
+        <h4 class="product-name">{{ product.name }}</h4>
+        
+        <div class="product-return">
+            <div class="return-label">Target Return Rate</div>
+            <div class="return-val">{{ product.expected_annual_return }}% <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">p.a.</span></div>
+        </div>
+
+        <p class="product-desc">{{ product.description }}</p>
+
+        <div class="product-meta">
+            <div>
+                <div class="meta-label">Min Investment</div>
+                <div class="meta-val">R{{ product.minimum_investment|floatformat:0 }}</div>
+            </div>
+            <a href="{% url 'simulate' product.id %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-calculator"></i> Simulate
+            </a>
+        </div>
+    </div>
+    {% empty %}
+    <p style="color: hsl(var(--text-muted));">No Money Market products available.</p>
+    {% endfor %}
+</div>
+
+<div class="section-header">
+    <h3><i class="fa-solid fa-globe" style="color: #c084fc"></i> Equity-Linked Products</h3>
+</div>
+<div class="investment-grid">
+    {% for product in grouped.equity %}
+    <div class="product-card">
+        <span class="badge-risk {{ product.risk_rating }}">{{ product.risk_rating }} risk</span>
+        <h4 class="product-name">{{ product.name }}</h4>
+        
+        <div class="product-return">
+            <div class="return-label">Target Return Rate</div>
+            <div class="return-val">{{ product.expected_annual_return }}% <span style="font-size: 0.9rem; font-weight: 500; color: hsl(var(--text-muted));">p.a.</span></div>
+        </div>
+
+        <p class="product-desc">{{ product.description }}</p>
+
+        <div class="product-meta">
+            <div>
+                <div class="meta-label">Min Investment</div>
+                <div class="meta-val">R{{ product.minimum_investment|floatformat:0 }}</div>
+            </div>
+            <a href="{% url 'simulate' product.id %}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-calculator"></i> Simulate
+            </a>
+        </div>
+    </div>
+    {% empty %}
+    <p style="color: hsl(var(--text-muted));">No Equity-Linked products available.</p>
+    {% endfor %}
+</div>
+{% endblock %}

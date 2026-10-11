@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}My Simulations – WealthIQ{% endblock %}
+{% block page_title %}Simulation Logs{% endblock %}
+
+{% block content %}
+<div class="card tx-table-card">
+    <div class="tx-table-header">
+        <h3 class="chart-title">
+            <i class="fa-solid fa-clock-rotate-left" style="color: hsl(var(--primary))"></i>
+            Saved Investment Projections
+        </h3>
+        <a href="{% url 'calculator' %}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus"></i> New Simulation
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="tx-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Term</th>
+                    <th>Starting Capital</th>
+                    <th>Monthly Deposit</th>
+                    <th>Growth Rate</th>
+                    <th>Final Projected Value</th>
+                    <th>Calculated On</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sim in simulations %}
+                <tr>
+                    <td style="font-weight: 600;">{{ sim.product.name|default:"Custom Target Portfolio" }}</td>
+                    <td><span class="badge-cat cat-transport">{{ sim.years }} Years</span></td>
+                    <td>R{{ sim.starting_amount|floatformat:2 }}</td>
+                    <td>R{{ sim.monthly_contribution|floatformat:2 }}/mo</td>
+                    <td style="font-weight: 600; color: hsl(var(--primary));">{{ sim.interest_rate }}%</td>
+                    <td style="font-weight: 800; color: hsl(var(--success));" class="tx-amount">R{{ sim.final_value|floatformat:2 }}</td>
+                    <td style="color: hsl(var(--text-muted)); font-size: 0.8rem;">{{ sim.created_at|date:"d M Y, H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: hsl(var(--text-muted)); padding: 3rem;">
+                        <i class="fa-solid fa-calculator" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: hsl(var(--text-muted));"></i>
+                        No saved simulation records found. Go to Growth Calculator and save a simulation to see logs here.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

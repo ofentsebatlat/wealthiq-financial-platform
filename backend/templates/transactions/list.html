@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions – WealthIQ{% endblock %}
+{% block page_title %}Transaction History{% endblock %}
+
+{% block content %}
+<div class="card tx-table-card">
+    <div class="tx-table-header" style="flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fa-solid fa-receipt" style="color: hsl(var(--primary)); font-size: 1.25rem;"></i>
+            <h3 class="chart-title">Logged Transactions</h3>
+        </div>
+        
+        <!-- Filters Form -->
+        <form method="GET" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-left: auto;">
+            <!-- Search field -->
+            <input type="text" name="search" value="{{ search }}" placeholder="Search merchant..." class="form-control" style="width: 200px; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+            
+            <!-- Category dropdown -->
+            <select name="category" class="form-control" style="width: 150px; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                <option value="">All Categories</option>
+                <option value="food" {% if category_filter == 'food' %}selected{% endif %}>Food & Groceries</option>
+                <option value="transport" {% if category_filter == 'transport' %}selected{% endif %}>Transport</option>
+                <option value="entertainment" {% if category_filter == 'entertainment' %}selected{% endif %}>Entertainment</option>
+                <option value="utilities" {% if category_filter == 'utilities' %}selected{% endif %}>Utilities</option>
+                <option value="savings" {% if category_filter == 'savings' %}selected{% endif %}>Savings</option>
+                <option value="shopping" {% if category_filter == 'shopping' %}selected{% endif %}>Shopping</option>
+                <option value="health" {% if category_filter == 'health' %}selected{% endif %}>Health & Medical</option>
+                <option value="education" {% if category_filter == 'education' %}selected{% endif %}>Education</option>
+                <option value="other" {% if category_filter == 'other' %}selected{% endif %}>Other</option>
+            </select>
+
+            <!-- Type dropdown -->
+            <select name="type" class="form-control" style="width: 120px; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                <option value="">All Types</option>
+                <option value="income" {% if type_filter == 'income' %}selected{% endif %}>Income</option>
+                <option value="expense" {% if type_filter == 'expense' %}selected{% endif %}>Expense</option>
+            </select>
+
+            <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.4rem 1rem;">
+                <i class="fa-solid fa-filter"></i> Apply
+            </button>
+            {% if search or category_filter or type_filter %}
+            <a href="{% url 'transactions' %}" class="btn btn-danger btn-sm" style="padding: 0.4rem 1rem;">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="tx-table">
+            <thead>
+                <tr>
+                    <th>Merchant</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr>
+                    <td style="font-weight: 600;">{{ tx.merchant }}</td>
+                    <td style="color: hsl(var(--text-muted)); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ tx.description|default:"—" }}
+                    </td>
+                    <td><span class="badge-cat cat-{{ tx.category }}">{{ tx.category }}</span></td>
+                    <td>{{ tx.date|date:"d M Y" }}</td>
+                    <td>
+                        <span style="font-weight: 500; font-size: 0.8rem; color: {% if tx.transaction_type == 'income' %}hsl(var(--success)){% else %}hsl(var(--text-muted)){% endif %}">
+                            {{ tx.transaction_type|title }}
+                        </span>
+                    </td>
+                    <td class="tx-amount {% if tx.transaction_type == 'income' %}income{% endif %}">
+                        {% if tx.transaction_type == 'expense' %}-{% endif %}R{{ tx.amount|floatformat:2 }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: hsl(var(--text-muted)); padding: 3rem;">
+                        <i class="fa-solid fa-circle-info" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: hsl(var(--text-muted));"></i>
+                        No matching transactions found. Try resetting filters or adding new transactions.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Investment Calculator – WealthIQ{% endblock %}
+{% block page_title %}Investment Calculator & Projection{% endblock %}
+
+{% block content %}
+<div class="calc-grid">
+    <!-- Configuration Panel (Left) -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="card">
+            <h3
+                style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-sliders" style="color: hsl(var(--primary))"></i>
+                Parameters
+            </h3>
+
+            <form method="POST" id="calcForm">
+                {% csrf_token %}
+
+                <!-- Product Link -->
+                <div class="form-group">
+                    <label for="product_id" class="form-label">Linked Product (Optional)</label>
+                    <select id="product_id" name="product_id" class="form-control" onchange="applyProductDefaults()">
+                        <option value="">Manual / Custom Simulation</option>
+                        {% for prod in products %}
+                        <option value="{{ prod.id }}" data-rate="{{ prod.expected_annual_return }}"
+                            data-min="{{ prod.minimum_investment }}" {% if selected_product and selected_product.id == prod.id or product and product.id == prod.id %}selected{% endif %}>
+                            {{ prod.name }} ({{ prod.expected_annual_return }}%)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="starting_amount" class="form-label">Starting Capital (ZAR)</label>
+                    <input type="number" step="100" id="starting_amount" name="starting_amount" class="form-control"
+                        placeholder="1000" required
+                        value="{% if selected_product %}{{ selected_product.minimum_investment|floatformat:0 }}{% elif product %}{{ starting_amount }}{% else %}1000{% endif %}">
+                    <small id="minInvestWarning"
+                        style="color: #fbbf24; font-size: 0.75rem; margin-top: 0.25rem; display: none;">
+                        ⚠️ Below recommended minimum investment of R<span id="warnMinVal"></span> for this product.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="monthly_contribution" class="form-label">Monthly Addition (ZAR)</label>
+                    <input type="number" step="50" id="monthly_contribution" name="monthly_contribution"
+                        class="form-control" placeholder="250" required
+                        value="{% if result %}{{ request.POST.monthly_contribution }}{% else %}250{% endif %}">
+                </div>
+
+                <div class="form-group">
+                    <label for="interest_rate" class="form-label">Annual Growth Rate (%)</label>
+                    <input type="number" step="0.01" id="interest_rate" name="interest_rate" class="form-control"
+                        placeholder="10.0" required
+                        value="{% if selected_product %}{{ selected_product.expected_annual_return }}{% elif product %}{{ interest_rate }}{% else %}10{% endif %}">
+                </div>
+
+                <div class="form-group">
+                    <label for="years" class="form-label">Time Period (Years)</label>
+                    <select id="years" name="years" class="form-control" required>
+                        <option value="1">1 Year</option>
+                        <option value="3">3 Years</option>
+                        <option value="5" selected>5 Years</option>
+                        <option value="10">10 Years</option>
+                        <option value="15">15 Years</option>
+                        <option value="20">20 Years</option>
+                        <option value="30">30 Years</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    <i class="fa-solid fa-chart-line-up"></i> Project Growth
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Projection Analysis Panel (Right) -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Metrics Display -->
+        <div id="metricsRow" class="grid-cols-3" style="display: none; margin-bottom: 0;">
+            <div class="card stat-card" style="padding: 1.25rem;">
+                <div class="stat-details">
+                    <div class="stat-label">Total Capital Invested</div>
+                    <div class="stat-val" id="valInvested" style="font-size: 1.35rem;">R0.00</div>
+                </div>
+            </div>
+            <div class="card stat-card" style="padding: 1.25rem;">
+                <div class="stat-details">
+                    <div class="stat-label">Interest / Profit Earned</div>
+                    <div class="stat-val" id="valGrowth" style="font-size: 1.35rem; color: hsl(var(--success));">R0.00
+                    </div>
+                </div>
+            </div>
+            <div class="card stat-card" style="padding: 1.25rem;">
+                <div class="stat-details">
+                    <div class="stat-label">Estimated Final Value</div>
+                    <div class="stat-val" id="valFinal" style="font-size: 1.35rem; color: hsl(var(--primary));">R0.00
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projected Growth Chart -->
+        <div class="card" style="flex-grow: 1;">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fa-solid fa-chart-line" style="color: hsl(var(--primary))"></i>
+                    Compound Projections Graph
+                </h3>
+                <span id="chartSub" style="font-size: 0.8rem; color: hsl(var(--text-muted))">Compound Interest
+                    Timeline</span>
+            </div>
+            <div class="chart-wrapper" style="min-height: 320px;">
+                <canvas id="growthChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/calculator.js"></script>
+{% endblock %}

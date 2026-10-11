@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Smart Guidance – WealthIQ{% endblock %}
+{% block page_title %}WealthIQ Smart Guidance{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, hsla(var(--primary), 0.1), transparent); border-color: hsla(var(--primary), 0.25);">
+    <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div style="font-size: 3rem; color: #fbbf24; text-shadow: 0 0 20px rgba(251, 191, 36, 0.45);">
+            <i class="fa-solid fa-lightbulb"></i>
+        </div>
+        <div>
+            <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;">Personalised Financial Intelligence</h2>
+            <p style="color: hsl(var(--text-secondary)); max-width: 700px; font-size: 0.95rem;">
+                WealthIQ scans your transaction history and spending proportions to generate real-time advice. 
+                Below are recommendations to optimise your budgeting and accelerate saving.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="fa-solid fa-wand-magic-sparkles" style="color: hsl(var(--primary))"></i>
+        Current Recommendations
+    </h3>
+    
+    <div class="tips-list">
+        {% for tip in tips %}
+        <div class="tip-card" style="padding: 1.25rem; border-left: 4px solid {% if tip.type == 'warning' %}#fbbf24{% elif tip.type == 'success' %}#34d399{% else %}#60a5fa{% endif %};">
+            <div class="tip-card-icon" style="font-size: 2rem;">{{ tip.icon }}</div>
+            <div>
+                <h4 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">{{ tip.title }}</h4>
+                <p style="font-size: 0.95rem; color: hsl(var(--text-secondary)); line-height: 1.5;">{{ tip.message }}</p>
+            </div>
+        </div>
+        {% empty %}
+        <div style="text-align: center; padding: 3rem; color: hsl(var(--text-muted));">
+            <i class="fa-solid fa-check-circle" style="font-size: 2.5rem; margin-bottom: 1rem; color: hsl(var(--success)); display: block;"></i>
+            You are fully optimized! No warnings or tips are active. Keep maintaining your budget!
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

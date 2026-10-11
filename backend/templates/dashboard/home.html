@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard – WealthIQ{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     VIRTUAL CARD PANEL
+     Card reveal and checkout are gated behind BiometricVerifyModal
+══════════════════════════════════════════════════════════════════════════════ -->
+<div class="virtual-card-section card" style="padding: 1.5rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; border-bottom:1px solid var(--color-border-card); padding-bottom:0.75rem;">
+        <h3 class="chart-title">
+            <i class="fa-solid fa-credit-card" style="color:#003B5C"></i>
+            Virtual Debit Card
+        </h3>
+        <span class="reveal-badge">
+            <i class="fa-solid fa-lock" style="color:#E4222D"></i>
+            Biometric Protected
+        </span>
+    </div>
+
+    <div class="virtual-card-wrapper">
+
+        <!-- The physical card face -->
+        <div class="virtual-card">
+            <div class="card-top-row">
+                <div class="card-brand-name">Wealth<span>IQ</span></div>
+                <div class="card-chip"></div>
+            </div>
+
+            <div id="vc-number" class="card-number-row">
+                ████ ████ ████ <span id="vc-last4">{{ user.account_number|slice:"-4:" }}</span>
+            </div>
+
+            <div class="card-bottom-row">
+                <div class="card-meta-group">
+                    <span class="card-meta-label">Card Holder</span>
+                    <span class="card-meta-val" style="font-family:inherit; letter-spacing:0;">{{ user.first_name }} {{ user.last_name }}</span>
+                </div>
+                <div class="card-meta-group" style="align-items:center;">
+                    <span class="card-meta-label">Expires</span>
+                    <span id="vc-expiry" class="card-meta-val">••/••</span>
+                </div>
+                <div class="card-meta-group" style="align-items:flex-end;">
+                    <span class="card-meta-label">CVV</span>
+                    <span id="vc-cvv" class="card-meta-val">•••</span>
+                </div>
+                <div class="card-network-logo">
+                    <span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card action panel -->
+        <div class="card-actions-panel">
+
+            <!-- Reveal Info action -->
+            <div>
+                <div class="card-action-title">Card Details</div>
+                <p class="card-action-desc">
+                    Card number, expiry, and CVV are masked for your security.
+                    Biometric verification is required to reveal sensitive information.
+                </p>
+                <button id="reveal-card-btn" class="btn btn-primary btn-sm" type="button">
+                    <i class="fa-solid fa-eye"></i> Reveal Info
+                    <span class="security-badge"><i class="fa-solid fa-fingerprint"></i> Secure</span>
+                </button>
+                <div id="reveal-timer" style="display:none; font-size:12px; color:var(--color-muted-gray); margin-top:0.5rem;">
+                    <i class="fa-solid fa-clock"></i> Details will re-mask in <span id="reveal-countdown">30</span>s
+                </div>
+            </div>
+
+            <!-- Virtual Checkout form -->
+            <div class="checkout-modal-wrapper">
+                <div class="checkout-modal-title">
+                    <i class="fa-solid fa-cart-shopping" style="color:#003B5C"></i>
+                    Virtual Checkout
+                </div>
+                <form id="checkout-form" class="checkout-form" autocomplete="off">
+                    {% csrf_token %}
+                    <div>
+                        <label for="checkout-merchant" class="form-label">Merchant</label>
+                        <input type="text" id="checkout-merchant" class="form-control" placeholder="e.g. Takealot, Netflix" required>
+                    </div>
+                    <div class="checkout-amount-row">
+                        <div style="flex-grow:1;">
+                            <label for="checkout-amount" class="form-label">Amount (ZAR)</label>
+                            <input type="number" id="checkout-amount" class="form-control" step="0.01" min="1" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <button id="checkout-pay-btn" type="submit" class="btn btn-primary" style="width:100%;">
+                        <i class="fa-solid fa-bolt"></i> Pay Now
+                        <span id="checkout-secure-badge" style="display:none" class="security-badge">
+                            <i class="fa-solid fa-lock"></i> R2,000+ Verification
+                        </span>
+                    </button>
+                    <div id="checkout-status" class="checkout-status"></div>
+                </form>
+            </div>
+
+        </div><!-- /card-actions-panel -->
+    </div><!-- /virtual-card-wrapper -->
+</div>
+
+<!-- Quick Stats Banner -->
+<div class="grid-cols-4">
+    <!-- Balance -->
+    <div class="card stat-card">
+        <div class="stat-icon">
+            <i class="fa-solid fa-wallet"></i>
+        </div>
+        <div class="stat-details">
+            <div class="stat-label">Available Balance</div>
+            <div class="stat-val">R{{ stats.balance|floatformat:2 }}</div>
+        </div>
+    </div>
+    
+    <!-- Monthly Income -->
+    <div class="card stat-card">
+        <div class="stat-icon income">
+            <i class="fa-solid fa-arrow-trend-up"></i>
+        </div>
+        <div class="stat-details">
+            <div class="stat-label">Monthly Income</div>
+            <div class="stat-val">R{{ stats.monthly_income|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <!-- Monthly Expenses -->
+    <div class="card stat-card">
+        <div class="stat-icon expense">
+            <i class="fa-solid fa-arrow-trend-down"></i>
+        </div>
+        <div class="stat-details">
+            <div class="stat-label">Monthly Expenses</div>
+            <div class="stat-val">R{{ stats.monthly_expenses|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <!-- Savings Rate -->
+    <div class="card stat-card">
+        <div class="stat-icon savings">
+            <i class="fa-solid fa-piggy-bank"></i>
+        </div>
+        <div class="stat-details">
+            <div class="stat-label">Savings Rate</div>
+            <div class="stat-val">{{ stats.savings_rate }}%</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Analytics Grid -->
+<div class="charts-grid">
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Monthly income vs expenses bar chart -->
+        <div class="card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fa-solid fa-chart-column" style="color: hsl(var(--primary))"></i>
+                    Income vs Expenses
+                </h3>
+                <span style="font-size: 0.8rem; color: hsl(var(--text-muted))">Past 6 Months</span>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="incomeExpensesChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Spending Trends line chart -->
+        <div class="card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fa-solid fa-chart-line" style="color: #c084fc"></i>
+                    Monthly Spending Trends
+                </h3>
+                <span style="font-size: 0.8rem; color: hsl(var(--text-muted))">Category Analysis</span>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="spendingTrendsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spending Breakdown pie chart -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="card">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fa-solid fa-chart-pie" style="color: #4ecdc4"></i>
+                    Spending Breakdown
+                </h3>
+                <select id="spendingMonths" class="form-control" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px;" onchange="loadCategoryPieChart()">
+                    <option value="1" selected>Last 30 Days</option>
+                    <option value="3">Last 90 Days</option>
+                    <option value="6">Last 6 Months</option>
+                </select>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="categoryPieChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Smart Guidance Dashboard Widget -->
+        <div class="guidance-widget">
+            <h3 class="chart-title" style="margin-bottom: 1.25rem;">
+                <i class="fa-solid fa-bolt" style="color: #fbbf24"></i>
+                WealthIQ Insights
+            </h3>
+            <div id="guidanceContainer" class="tips-list">
+                <div style="text-align: center; padding: 2rem; color: hsl(var(--text-muted))">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Generating insights...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions Panel -->
+<div class="card tx-table-card">
+    <div class="tx-table-header">
+        <h3 class="chart-title">
+            <i class="fa-solid fa-clock" style="color: hsl(var(--primary))"></i>
+            Recent Activity
+        </h3>
+        <a href="{% url 'transactions' %}" class="btn btn-secondary btn-sm">View All History</a>
+    </div>
+    <div class="table-responsive">
+        <table class="tx-table">
+            <thead>
+                <tr>
+                    <th>Merchant</th>
+                    <th>Category</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in recent_transactions %}
+                <tr>
+                    <td style="font-weight: 600;">{{ tx.merchant }}</td>
+                    <td><span class="badge-cat cat-{{ tx.category }}">{{ tx.category }}</span></td>
+                    <td>{{ tx.date|date:"d M Y" }}</td>
+                    <td>
+                        <span style="font-weight: 500; font-size: 0.8rem; color: {% if tx.transaction_type == 'income' %}hsl(var(--success)){% else %}hsl(var(--text-muted)){% endif %}">
+                            {{ tx.transaction_type|title }}
+                        </span>
+                    </td>
+                    <td class="tx-amount {% if tx.transaction_type == 'income' %}income{% endif %}">
+                        {% if tx.transaction_type == 'expense' %}-{% endif %}R{{ tx.amount|floatformat:2 }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: hsl(var(--text-muted)); padding: 2rem;">No recent transactions found. Go to Transactions &gt; Add Transaction to record your first.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/charts.js"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   DASHBOARD — Virtual Card & Checkout Logic
+   All sensitive actions delegate to WealthIQSecurity.verify()
+════════════════════════════════════════════════════════════════════════════ */
+(function () {
+
+    /* ── Deterministic virtual card data (from account_number) ── */
+    const acctNum = '{{ user.account_number }}';
+    const last4   = acctNum.slice(-4);
+    // Generate fake full card number: keep last4, fill rest deterministically
+    function padGroup(seed, n) {
+        let h = 0;
+        for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+        return String(h).slice(0,n).padStart(n,'0');
+    }
+    const g1 = padGroup(acctNum + '1', 4);
+    const g2 = padGroup(acctNum + '2', 4);
+    const g3 = padGroup(acctNum + '3', 4);
+    const fullCardNum = g1 + ' ' + g2 + ' ' + g3 + ' ' + last4;
+
+    // Expiry: account joined in 2024 + 5 year validity
+    const expMonth = ((parseInt(last4.slice(0,2)) % 12) + 1).toString().padStart(2,'0');
+    const expYear  = String((parseInt(last4) % 5) + 2027).slice(-2);
+    const expiry   = expMonth + '/' + expYear;
+
+    // CVV: 3 digits
+    const cvv = padGroup(acctNum + 'cvv', 3);
+
+    /* ── DOM refs ── */
+    const vcNumber   = document.getElementById('vc-number');
+    const vcExpiry   = document.getElementById('vc-expiry');
+    const vcCvv      = document.getElementById('vc-cvv');
+    const revealBtn  = document.getElementById('reveal-card-btn');
+    const revealTimer= document.getElementById('reveal-timer');
+    const countdown  = document.getElementById('reveal-countdown');
+
+    let revealTimeout = null;
+    let countdownInterval = null;
+
+    function maskCard() {
+        vcNumber.innerHTML  = '████ ████ ████ <span id="vc-last4">' + last4 + '</span>';
+        vcExpiry.textContent = '••/••';
+        vcCvv.textContent    = '•••';
+        vcNumber.classList.remove('revealed');
+        revealTimer.style.display = 'none';
+        revealBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Reveal Info <span class="security-badge"><i class="fa-solid fa-fingerprint"></i> Secure</span>';
+        clearTimeout(revealTimeout);
+        clearInterval(countdownInterval);
+    }
+
+    function revealCard() {
+        vcNumber.textContent = fullCardNum;
+        vcNumber.classList.add('revealed');
+        vcExpiry.textContent = expiry;
+        vcCvv.textContent    = cvv;
+        revealTimer.style.display = 'block';
+        revealBtn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Re-mask';
+        revealBtn.onclick = maskCard;
+
+        let secs = 30;
+        countdown.textContent = secs;
+        countdownInterval = setInterval(() => {
+            secs--;
+            countdown.textContent = secs;
+            if (secs <= 0) { clearInterval(countdownInterval); maskCard(); }
+        }, 1000);
+
+        revealTimeout = setTimeout(maskCard, 30000);
+    }
+
+    /* Reveal button — gated by biometric verify */
+    if (revealBtn) {
+        revealBtn.addEventListener('click', async function handleReveal() {
+            // Check if already revealed — toggle mask
+            if (vcNumber.classList.contains('revealed')) { maskCard(); return; }
+            try {
+                await WealthIQSecurity.verify();
+                revealCard();
+            } catch (_) {
+                /* User cancelled — do nothing */
+            }
+        });
+    }
+
+    /* ── Virtual Checkout — gate at R2,000+ ── */
+    const checkoutForm       = document.getElementById('checkout-form');
+    const checkoutAmountEl   = document.getElementById('checkout-amount');
+    const checkoutMerchantEl = document.getElementById('checkout-merchant');
+    const checkoutStatus     = document.getElementById('checkout-status');
+    const checkoutSecBadge   = document.getElementById('checkout-secure-badge');
+
+    if (checkoutAmountEl) {
+        checkoutAmountEl.addEventListener('input', function () {
+            const amt = parseFloat(this.value) || 0;
+            if (checkoutSecBadge) {
+                checkoutSecBadge.style.display = amt >= 2000 ? 'inline-flex' : 'none';
+            }
+        });
+    }
+
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const amount   = parseFloat(checkoutAmountEl.value) || 0;
+            const merchant = checkoutMerchantEl.value.trim();
+
+            if (!merchant || amount <= 0) {
+                checkoutStatus.textContent = 'Please enter a merchant name and amount.';
+                checkoutStatus.className = 'checkout-status error';
+                return;
+            }
+
+            /* Gate: require biometric verify for R2,000+ */
+            if (amount >= 2000) {
+                try {
+                    await WealthIQSecurity.verify();
+                } catch (_) {
+                    checkoutStatus.textContent = 'Payment cancelled — verification required for R2,000+.';
+                    checkoutStatus.className = 'checkout-status error';
+                    return;
+                }
+            }
+
+            /* Post the transaction via AJAX to existing add_transaction endpoint */
+            const csrfToken = checkoutForm.querySelector('[name=csrfmiddlewaretoken]').value;
+            const today = new Date().toISOString().split('T')[0];
+
+            try {
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', csrfToken);
+                formData.append('merchant', merchant);
+                formData.append('description', 'Virtual Card Payment');
+                formData.append('amount', amount.toFixed(2));
+                formData.append('transaction_type', 'expense');
+                formData.append('date', today);
+                formData.append('category', 'shopping');
+
+                checkoutStatus.textContent = 'Processing payment…';
+                checkoutStatus.className   = 'checkout-status';
+
+                const resp = await fetch('{% url "add_transaction" %}', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData,
+                });
+
+                /* The view redirects on success; a redirect = transaction saved */
+                if (resp.redirected || resp.ok) {
+                    checkoutStatus.innerHTML = '<i class="fa-solid fa-circle-check"></i> Payment of R' + amount.toLocaleString('en-ZA', {minimumFractionDigits:2}) + ' to ' + merchant + ' approved!';
+                    checkoutStatus.className = 'checkout-status success';
+                    checkoutAmountEl.value   = '';
+                    checkoutMerchantEl.value = '';
+                    if (checkoutSecBadge) checkoutSecBadge.style.display = 'none';
+                } else {
+                    throw new Error('Server error ' + resp.status);
+                }
+            } catch (err) {
+                checkoutStatus.textContent = 'Payment failed. Please try again.';
+                checkoutStatus.className   = 'checkout-status error';
+            }
+        });
+    }
+
+})();
+</script>
+{% endblock %}

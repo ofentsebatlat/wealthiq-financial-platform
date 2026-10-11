@@ -1,0 +1,6 @@
+{
+  "name": "WealthIQ Capitec Extension",
+  "description": "An advanced personal finance dashboard and investment simulator styled as a Capitec extension, featuring real-time AI smart financial guidance, interactive calculators, and custom simulations.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Camera permissions policy — required for biometric scanning -->
+    <meta http-equiv="Permissions-Policy" content="camera=*">
+    <title>{% block title %}WealthIQ – Capitec Financial Intelligence{% endblock %}</title>
+    
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    {% if user.is_authenticated %}
+    <!-- Hidden username anchor for security.js -->
+    <span id="wiq-username" data-username="{{ user.username }}" style="display:none"></span>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         SECURITY ENROLLMENT OVERLAY — Step 1: Credentials, Step 2: Biometric
+    ══════════════════════════════════════════════════════════════════════════ -->
+    <div id="security-enrollment-overlay" role="dialog" aria-modal="true" aria-label="Security Enrollment">
+        <div class="enroll-card">
+
+            <!-- Brand header -->
+            <div class="enroll-brand">
+                <div class="enroll-brand-logo">Wealth<span>IQ</span></div>
+                <div class="enroll-brand-sub">Capitec Security Portal</div>
+            </div>
+
+            <!-- Step progress pills -->
+            <div class="enroll-steps" aria-label="Enrollment progress">
+                <div class="enroll-step-dot active"></div>
+                <div class="enroll-step-dot"></div>
+            </div>
+
+            <!-- ── STEP 1: Credentials Setup ── -->
+            <div id="enroll-step-1" class="enroll-step visible">
+                <div class="enroll-step-title">
+                    <i class="fa-solid fa-shield-halved" style="color:#E4222D; margin-right:0.4rem"></i>
+                    Secure Profile Setup
+                </div>
+                <p class="enroll-step-desc">
+                    Create your secure profile to access your WealthIQ account.
+                    Your credentials are stored locally — never on a server.
+                </p>
+
+                <!-- Full Name -->
+                <div class="enroll-sub-label">Full Name</div>
+                <input
+                    type="text"
+                    id="enroll-name"
+                    class="enroll-input"
+                    placeholder="e.g. Thabo Nkosi"
+                    autocomplete="name"
+                    required
+                >
+
+                <!-- PIN entry -->
+                <div id="step1-pin-section">
+                    <div class="enroll-sub-label">Create Remote PIN</div>
+                    <div id="enroll-pin-dots" class="pin-dots">
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                    </div>
+                    <div id="enroll-pin-keypad" class="pin-keypad"></div>
+                </div>
+
+                <!-- Confirm PIN -->
+                <div id="step1-confirm-section" class="hidden">
+                    <div class="enroll-sub-label">Confirm Remote PIN</div>
+                    <div id="enroll-confirm-dots" class="pin-dots">
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                        <span class="pin-dot"></span>
+                    </div>
+                    <div id="enroll-confirm-keypad" class="pin-keypad"></div>
+                </div>
+
+                <p id="enroll-pin-error" class="pin-error-msg"></p>
+            </div>
+
+            <!-- ── STEP 2: Biometric Face Snapshot ── -->
+            <div id="enroll-step-2" class="enroll-step">
+                <div class="enroll-step-title">
+                    <i class="fa-solid fa-face-viewfinder" style="color:#E4222D; margin-right:0.4rem"></i>
+                    Biometric Face Scan
+                </div>
+                <p class="enroll-step-desc">
+                    Look directly at the camera. Hold still while we capture your
+                    secure biometric profile.
+                </p>
+
+                <!-- Camera notice (shown if denied/iframe) -->
+                <div id="enroll-camera-notice" class="camera-notice"></div>
+
+                <!-- Circular camera viewport -->
+                <div class="camera-viewport">
+                    <video id="enroll-video" class="camera-video" playsinline muted></video>
+                    <div id="enroll-laser" class="laser-line"></div>
+                </div>
+
+                <!-- Scan progress -->
+                <div id="enroll-pct" class="scan-pct"></div>
+                <div id="enroll-status" class="scan-status">Waiting for camera…</div>
+
+                <!-- Action buttons -->
+                <button id="enroll-scan-btn" class="enroll-btn enroll-btn-primary" type="button" style="display:none">
+                    <i class="fa-solid fa-camera"></i> Capture Biometric
+                </button>
+                <button id="enroll-simulate-btn" class="enroll-btn enroll-btn-outline" type="button">
+                    <i class="fa-solid fa-circle-play"></i> Simulate Secure Biometric Scan
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         BIOMETRIC VERIFY MODAL — Reusable two-phase gate
+    ══════════════════════════════════════════════════════════════════════════ -->
+    <div id="biometric-verify-modal" role="dialog" aria-modal="true" aria-label="Identity Verification">
+        <div class="verify-card">
+
+            <div class="verify-header">
+                <div class="verify-title">
+                    <i class="fa-solid fa-lock"></i>
+                    Identity Verification
+                </div>
+                <button class="verify-cancel-btn" type="button" title="Cancel" aria-label="Cancel verification">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Phase 1: PIN Check -->
+            <div id="verify-phase-1" class="verify-phase">
+                <div class="verify-phase-label">Step 1 of 2 — Remote PIN</div>
+                <p class="verify-phase-desc">
+                    Enter your 4-digit Remote PIN to authorise this action.
+                </p>
+                <div id="verify-pin-dots" class="pin-dots">
+                    <span class="pin-dot"></span>
+                    <span class="pin-dot"></span>
+                    <span class="pin-dot"></span>
+                    <span class="pin-dot"></span>
+                </div>
+                <div id="verify-pin-keypad" class="pin-keypad"></div>
+                <p id="verify-pin-error" class="pin-error-msg"></p>
+            </div>
+
+            <!-- Phase 2: Biometric Face Match -->
+            <div id="verify-phase-2" class="verify-phase">
+                <div class="verify-phase-label">Step 2 of 2 — Face Match</div>
+                <p class="verify-phase-desc">
+                    Look directly at the camera. Our system will verify your identity.
+                </p>
+
+                <!-- Camera notice (iframe/denied) -->
+                <div id="verify-camera-notice" class="camera-notice"></div>
+
+                <!-- Camera viewport -->
+                <div class="camera-viewport">
+                    <video id="verify-video" class="camera-video" playsinline muted></video>
+                    <div id="verify-laser" class="laser-line"></div>
+                </div>
+
+                <!-- Scan indicators -->
+                <div id="verify-pct" class="scan-pct"></div>
+                <div id="verify-status" class="scan-status">Waiting…</div>
+                <div id="verify-score" class="verify-score"></div>
+
+                <!-- Buttons -->
+                <div class="verify-btns">
+                    <button id="verify-scan-btn" class="verify-btn verify-btn-primary" type="button" style="display:none">
+                        <i class="fa-solid fa-camera"></i> Scan Face
+                    </button>
+                    <button id="verify-simulate-btn" class="verify-btn verify-btn-outline" type="button">
+                        <i class="fa-solid fa-circle-play"></i> Simulate Face Match
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="app-container">
+        {% if user.is_authenticated %}
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-wrapper">
+                    <span class="logo-text">Wealth<span class="highlight">IQ</span></span>
+                </div>
+                <div class="sub-brand">Capitec Extension</div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{% url 'transactions' %}" class="nav-link {% if request.resolver_match.url_name == 'transactions' or request.resolver_match.url_name == 'add_transaction' %}active{% endif %}">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>Transactions</span>
+                </a>
+                <a href="{% url 'investments' %}" class="nav-link {% if request.resolver_match.url_name == 'investments' or request.resolver_match.url_name == 'simulate' %}active{% endif %}">
+                    <i class="fa-solid fa-vault"></i>
+                    <span>Investments</span>
+                </a>
+                <a href="{% url 'calculator' %}" class="nav-link {% if request.resolver_match.url_name == 'calculator' %}active{% endif %}">
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>Growth Calculator</span>
+                </a>
+                <a href="{% url 'my_simulations' %}" class="nav-link {% if request.resolver_match.url_name == 'my_simulations' %}active{% endif %}">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>My Simulations</span>
+                </a>
+                <a href="{% url 'guidance' %}" class="nav-link {% if request.resolver_match.url_name == 'guidance' %}active{% endif %}">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span>Smart Guidance</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-user">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fa-solid fa-user-astronaut"></i>
+                    </div>
+                    <div class="user-details">
+                        <div class="username">{{ user.first_name }} {{ user.last_name }}</div>
+                        <div class="acc-number">Acc: {{ user.account_number|slice:":4" }}...{{ user.account_number|slice:"-4:" }}</div>
+                    </div>
+                </div>
+                <a href="{% url 'logout' %}" class="logout-btn" title="Sign Out">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Workspace Area -->
+        <main class="main-content {% if not user.is_authenticated %}full-width{% endif %}">
+            <!-- Topbar header -->
+            {% if user.is_authenticated %}
+            <header class="topbar">
+                <div class="page-title">
+                    <h1>{% block page_title %}Overview{% endblock %}</h1>
+                </div>
+                <div class="topbar-actions">
+                    <div class="balance-pill">
+                        <span class="pill-label">Available Balance:</span>
+                        <span class="pill-val">R{{ user.account_balance|floatformat:2 }}</span>
+                    </div>
+                    <a href="{% url 'add_transaction' %}" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-plus"></i> Add Transaction
+                    </a>
+                </div>
+            </header>
+            {% endif %}
+
+            <!-- Message alerts center -->
+            {% if messages %}
+            <div class="alerts-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    <span class="alert-icon">
+                        {% if message.tags == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                        {% elif message.tags == 'error' %}<i class="fa-solid fa-circle-xmark"></i>
+                        {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                    </span>
+                    <span class="alert-message">{{ message }}</span>
+                    <button class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Content Slot -->
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+
+            <!-- Footer -->
+            <footer class="app-footer">
+                <p>&copy; 2026 WealthIQ Banking Intelligence. Built as a Capitec Bank Digital Extension. All rights reserved.</p>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Biometric Security Module (must load before page-specific scripts) -->
+    {% if user.is_authenticated %}
+    <script src="/static/js/security.js"></script>
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

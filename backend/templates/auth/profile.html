@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile – WealthIQ{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 2rem;">
+        <div style="width: 96px; height: 96px; border-radius: 50%; background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary))); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #fff; box-shadow: var(--shadow-md); margin-bottom: 1rem;">
+            <i class="fa-solid fa-user-astronaut"></i>
+        </div>
+        <h2>{{ user.first_name }} {{ user.last_name }}</h2>
+        <p style="color: hsl(var(--text-muted));">Member since {{ user.date_joined|date:"F Y" }}</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-card)); padding-bottom: 0.75rem;">
+            <span style="color: hsl(var(--text-muted)); font-weight: 500;">Username</span>
+            <span style="font-weight: 600;">{{ user.username }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-card)); padding-bottom: 0.75rem;">
+            <span style="color: hsl(var(--text-muted)); font-weight: 500;">Email Address</span>
+            <span style="font-weight: 600;">{{ user.email }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-card)); padding-bottom: 0.75rem;">
+            <span style="color: hsl(var(--text-muted)); font-weight: 500;">Capitec Account Number</span>
+            <span style="font-weight: 700; font-family: monospace; letter-spacing: 0.05em;">{{ user.account_number }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-card)); padding-bottom: 0.75rem;">
+            <span style="color: hsl(var(--text-muted)); font-weight: 500;">Current Account Balance</span>
+            <span style="font-weight: 800; color: hsl(var(--primary));">R{{ user.account_balance|floatformat:2 }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-card)); padding-bottom: 0.75rem;">
+            <span style="color: hsl(var(--text-muted)); font-weight: 500;">System Privilege</span>
+            <span class="badge-cat cat-savings" style="margin: 0;">Client</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

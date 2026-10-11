@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if values are present and of valid types
+    function isValidSecurityProfile(data) {
+      return data.keys().hasAll(['userPin', 'userFacePhoto', 'isSecurityRegistered'])
+        && data.userPin is string
+        && data.userFacePhoto is string
+        && data.isSecurityRegistered is bool;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'date', 'description', 'category', 'type', 'amount'])
+        && data.id is string
+        && data.date is string
+        && data.description is string
+        && data.category is string
+        && data.type is string
+        && data.amount is number;
+    }
+
+    function isValidInvestmentItem(data) {
+      return data.keys().hasAll(['id', 'name', 'type', 'currentValue', 'monthlyContribution', 'expectedAnnualReturn', 'dateOpened'])
+        && data.id is string
+        && data.name is string
+        && data.type is string
+        && data.currentValue is number
+        && data.monthlyContribution is number
+        && data.expectedAnnualReturn is number
+        && data.dateOpened is string;
+    }
+
+    function isValidSimulationGoal(data) {
+      return data.keys().hasAll(['id', 'name', 'targetAmount', 'currentSaved', 'monthlyContribution', 'interestRate', 'targetDate', 'category'])
+        && data.id is string
+        && data.name is string
+        && data.targetAmount is number
+        && data.currentSaved is number
+        && data.monthlyContribution is number
+        && data.interestRate is number
+        && data.targetDate is string
+        && data.category is string;
+    }
+
+    function isValidVirtualCard(data) {
+      return data.keys().hasAll(['id', 'cardholderName', 'cardNumber', 'expiryDate', 'cvv', 'type', 'color', 'isFrozen', 'dailyLimit', 'monthlyLimit', 'spentThisMonth'])
+        && data.id is string
+        && data.cardholderName is string
+        && data.cardNumber is string
+        && data.expiryDate is string
+        && data.cvv is string
+        && data.type is string
+        && data.color is string
+        && data.isFrozen is bool
+        && data.dailyLimit is number
+        && data.monthlyLimit is number
+        && data.spentThisMonth is number;
+    }
+
+    function isValidSavingsPocket(data) {
+      return data.keys().hasAll(['id', 'name', 'balance', 'targetAmount', 'targetDate', 'interestRate', 'category', 'dateCreated', 'autoRoundUp', 'roundUpAmount'])
+        && data.id is string
+        && data.name is string
+        && data.balance is number
+        && data.targetAmount is number
+        && data.targetDate is string
+        && data.interestRate is number
+        && data.category is string
+        && data.dateCreated is string
+        && data.autoRoundUp is bool
+        && data.roundUpAmount is number;
+    }
+
+    match /security_profile/{document} {
+      allow read, write: if true;
+    }
+
+    match /transactions/{id} {
+      allow read, write: if true;
+    }
+
+    match /investments/{id} {
+      allow read, write: if true;
+    }
+
+    match /simulation_goals/{id} {
+      allow read, write: if true;
+    }
+
+    match /virtual_cards/{id} {
+      allow read, write: if true;
+    }
+
+    match /savings_pockets/{id} {
+      allow read, write: if true;
+    }
+  }
+}

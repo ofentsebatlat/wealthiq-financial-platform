@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "SecurityProfile": {
+      "title": "SecurityProfile",
+      "description": "User's biometrics and pin lock state",
+      "type": "object",
+      "properties": {
+        "userPin": { "type": "string" },
+        "userFacePhoto": { "type": "string" },
+        "isSecurityRegistered": { "type": "boolean" }
+      },
+      "required": ["userPin", "userFacePhoto", "isSecurityRegistered"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A ledger record of transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" }
+      },
+      "required": ["id", "date", "description", "category", "type", "amount"]
+    },
+    "InvestmentItem": {
+      "title": "InvestmentItem",
+      "description": "An investment or fixed deposit item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "currentValue": { "type": "number" },
+        "monthlyContribution": { "type": "number" },
+        "expectedAnnualReturn": { "type": "number" },
+        "dateOpened": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "currentValue", "monthlyContribution", "expectedAnnualReturn", "dateOpened"]
+    },
+    "SimulationGoal": {
+      "title": "SimulationGoal",
+      "description": "A target financial planning goal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentSaved": { "type": "number" },
+        "monthlyContribution": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "targetDate": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "name", "targetAmount", "currentSaved", "monthlyContribution", "interestRate", "targetDate", "category"]
+    },
+    "VirtualCard": {
+      "title": "VirtualCard",
+      "description": "A secure digital card",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cardholderName": { "type": "string" },
+        "cardNumber": { "type": "string" },
+        "expiryDate": { "type": "string" },
+        "cvv": { "type": "string" },
+        "type": { "type": "string" },
+        "color": { "type": "string" },
+        "isFrozen": { "type": "boolean" },
+        "dailyLimit": { "type": "number" },
+        "monthlyLimit": { "type": "number" },
+        "spentThisMonth": { "type": "number" }
+      },
+      "required": ["id", "cardholderName", "cardNumber", "expiryDate", "cvv", "type", "color", "isFrozen", "dailyLimit", "monthlyLimit", "spentThisMonth"]
+    },
+    "SavingsPocket": {
+      "title": "SavingsPocket",
+      "description": "A savings compartment with target options",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "balance": { "type": "number" },
+        "targetAmount": { "type": "number" },
+        "targetDate": { "type": "string" },
+        "interestRate": { "type": "number" },
+        "category": { "type": "string" },
+        "dateCreated": { "type": "string" },
+        "autoRoundUp": { "type": "boolean" },
+        "roundUpAmount": { "type": "number" }
+      },
+      "required": ["id", "name", "balance", "targetAmount", "targetDate", "interestRate", "category", "dateCreated", "autoRoundUp", "roundUpAmount"]
+    }
+  },
+  "firestore": {
+    "security_profile/user_data": {
+      "schema": { "$ref": "SecurityProfile" },
+      "description": "User security profile"
+    },
+    "transactions/{id}": {
+      "schema": { "$ref": "Transaction" },
+      "description": "User transaction ledger"
+    },
+    "investments/{id}": {
+      "schema": { "$ref": "InvestmentItem" },
+      "description": "User investment portfolio"
+    },
+    "simulation_goals/{id}": {
+      "schema": { "$ref": "SimulationGoal" },
+      "description": "User saving simulation goals"
+    },
+    "virtual_cards/{id}": {
+      "schema": { "$ref": "VirtualCard" },
+      "description": "User virtual cards"
+    },
+    "savings_pockets/{id}": {
+      "schema": { "$ref": "SavingsPocket" },
+      "description": "User savings pockets"
+    }
+  }
+}

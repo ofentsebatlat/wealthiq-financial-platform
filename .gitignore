@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.pkl
+env/
+venv/
+
+# Secrets
+.env
+.env*.local
+*.log
+.DS_Store
+Thumbs.db

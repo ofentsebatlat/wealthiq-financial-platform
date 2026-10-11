@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Add Transaction – WealthIQ{% endblock %}
+{% block page_title %}Add Transaction{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 540px; margin: 0 auto;">
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--color-border-card); padding-bottom: 1rem;">
+        <i class="fa-solid fa-circle-plus" style="color: var(--color-red); font-size: 1.5rem;"></i>
+        <h2 style="font-size: 1.5rem; font-weight: 700;">Record Transaction</h2>
+    </div>
+
+    <form id="add-tx-form" method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="merchant" class="form-label">Merchant Name</label>
+            <input type="text" id="merchant" name="merchant" class="form-control" placeholder="e.g. Checkers, Shell, Netflix" required>
+            <small style="color: var(--color-muted-gray); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                WealthIQ will automatically categorise the merchant if you leave the category blank.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label for="amount" class="form-label">Amount (ZAR)</label>
+            <input type="number" step="0.01" id="amount" name="amount" class="form-control" placeholder="0.00" required>
+        </div>
+
+        <div class="grid-cols-2" style="gap: 1rem; margin-bottom: 0;">
+            <div class="form-group">
+                <label for="transaction_type" class="form-label">Transaction Type</label>
+                <select id="transaction_type" name="transaction_type" class="form-control" required>
+                    <option value="expense" selected>Expense</option>
+                    <option value="income">Income</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="date" class="form-label">Date</label>
+                <input type="date" id="date" name="date" class="form-control" required value="{% now 'Y-m-d' %}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="category" class="form-label">Category (Optional)</label>
+            <select id="category" name="category" class="form-control">
+                <option value="">Auto-Detect Category</option>
+                <option value="food">Food &amp; Groceries</option>
+                <option value="transport">Transport</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="utilities">Utilities</option>
+                <option value="savings">Savings</option>
+                <option value="shopping">Shopping</option>
+                <option value="health">Health &amp; Medical</option>
+                <option value="education">Education</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="description" class="form-label">Description / Notes (Optional)</label>
+            <textarea id="description" name="description" class="form-control" rows="3" placeholder="Additional details..."></textarea>
+        </div>
+
+        <!-- High-value warning banner (shown when amount >= R5,000) -->
+        <div id="high-value-warning" class="high-value-warning">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>
+                Transactions of <strong>R5,000 or more</strong> require biometric verification before saving.
+                You will be prompted after clicking Save.
+            </span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="submit" id="save-tx-btn" class="btn btn-primary" style="flex-grow: 1;">
+                <i class="fa-solid fa-save"></i> Save Transaction
+                <span id="tx-secure-badge" style="display:none;" class="security-badge">
+                    <i class="fa-solid fa-fingerprint"></i> Verify
+                </span>
+            </button>
+            <a href="{% url 'transactions' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   HIGH-VALUE TRANSACTION GATE — requires biometric verify at R5,000+
+════════════════════════════════════════════════════════════════════════════ */
+(function () {
+    const form          = document.getElementById('add-tx-form');
+    const amountEl      = document.getElementById('amount');
+    const typeEl        = document.getElementById('transaction_type');
+    const warning       = document.getElementById('high-value-warning');
+    const secureBadge   = document.getElementById('tx-secure-badge');
+    const HIGH_VALUE_THRESHOLD = 5000;
+
+    let verificationPassed = false;
+
+    function isHighValue() {
+        const amt  = parseFloat(amountEl.value) || 0;
+        const type = typeEl ? typeEl.value : 'expense';
+        return amt >= HIGH_VALUE_THRESHOLD && type === 'expense';
+    }
+
+    function updateUI() {
+        const hv = isHighValue();
+        warning.classList.toggle('visible', hv);
+        if (secureBadge) secureBadge.style.display = hv ? 'inline-flex' : 'none';
+        if (hv) verificationPassed = false; // reset when amount changes
+    }
+
+    if (amountEl) amountEl.addEventListener('input', updateUI);
+    if (typeEl)   typeEl.addEventListener('change', updateUI);
+
+    if (form) {
+        form.addEventListener('submit', async function (e) {
+            if (!isHighValue()) return; // below threshold — submit normally
+
+            e.preventDefault(); // hold the form
+
+            if (verificationPassed) {
+                // Already verified this submission — go ahead
+                form.submit();
+                return;
+            }
+
+            try {
+                await WealthIQSecurity.verify();
+                verificationPassed = true;
+                form.submit();
+            } catch (_) {
+                // User cancelled or PIN wrong — stay on page
+                verificationPassed = false;
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}
