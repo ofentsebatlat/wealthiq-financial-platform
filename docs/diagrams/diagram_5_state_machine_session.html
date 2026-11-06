@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+stateDiagram-v2
+    [*] --> LOGGED_OUT: Initial Load
+
+    LOGGED_OUT --> AUTHENTICATING_PIN: Enter PIN
+    LOGGED_OUT --> AUTHENTICATING_FACE: Scan Face
+    
+    AUTHENTICATING_PIN --> ACTIVE_SESSION: PIN Valid
+    AUTHENTICATING_PIN --> PIN_ATTEMPT_FAILED: PIN Invalid (Attempt 1 or 2)
+    PIN_ATTEMPT_FAILED --> AUTHENTICATING_PIN: Retry Entry
+    PIN_ATTEMPT_FAILED --> FROZEN_LOCKOUT: 3rd Consecutive Failure
+
+    AUTHENTICATING_FACE --> ACTIVE_SESSION: Match d <= 0.60 & Blink Verified
+    AUTHENTICATING_FACE --> AUTHENTICATING_PIN: Face Mismatch Fallback
+
+    ACTIVE_SESSION --> INACTIVITY_LOCKED: 120s of Inactivity
+    INACTIVITY_LOCKED --> ACTIVE_SESSION: Re-entered PIN / Face Matched
+    INACTIVITY_LOCKED --> FROZEN_LOCKOUT: 3 Failed Re-auth Attempts
+
+    FROZEN_LOCKOUT --> ACTIVE_SESSION: Admin Override / OTP Verified
+    FROZEN_LOCKOUT --> LOGGED_OUT: 15-Minute Expiry Elapsed
+
+    ACTIVE_SESSION --> STEP_UP_REQUIRED: Transfer > R5,000 / Reveal CVV
+    STEP_UP_REQUIRED --> ACTIVE_SESSION: Step-Up Challenge Satisfied
+    STEP_UP_REQUIRED --> ACTIVE_SESSION: User Cancels Action
+
+    ACTIVE_SESSION --> LOGGED_OUT: Explicit Sign Out / Session Expiry
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

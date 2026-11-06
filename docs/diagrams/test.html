@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body { margin: 20px; background: white; font-family: sans-serif; }
+        .mermaid { display: flex; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+    graph TD
+        A[Client Web App] -->|HTTPS| B(Node.js Express Gateway)
+        B --> C[(ACID Document Store)]
+        B --> D[Python CV Microservice]
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
+</body>
+</html>

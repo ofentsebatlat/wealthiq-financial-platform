@@ -24,6 +24,12 @@ interface ProfileTabProps {
   userPin: string;
   userFacePhoto: string;
   startingBalance: number;
+  idNumber?: string;
+  dateOfBirth?: string;
+  accountNumber?: string;
+  accountType?: string;
+  enrollmentDate?: string;
+  onRequestBiometricVerification?: (title: string, onSuccess: () => void) => void;
   onUpdateProfile: (updated: {
     userName: string;
     userEmail: string;
@@ -41,12 +47,18 @@ export default function ProfileTab({
   userPin,
   userFacePhoto,
   startingBalance,
+  idNumber = "940615 5123 08 1",
+  dateOfBirth = "June 15, 1994",
+  accountNumber = "1431289445",
+  accountType = "Global One Account",
+  enrollmentDate = "July 1, 2026",
+  onRequestBiometricVerification,
   onUpdateProfile
 }: ProfileTabProps) {
   // Editable Fields State
   const [editedName, setEditedName] = useState(userName);
-  const [editedEmail, setEditedEmail] = useState(userEmail || "ofentsebatlang@gmail.com");
-  const [editedPhone, setEditedPhone] = useState(userPhone || "+27 82 456 7890");
+  const [editedEmail, setEditedEmail] = useState(userEmail || "");
+  const [editedPhone, setEditedPhone] = useState(userPhone || "");
   const [editedPin, setEditedPin] = useState(userPin);
   const [editedStartingBalance, setEditedStartingBalance] = useState(startingBalance);
   const [customPhoto, setCustomPhoto] = useState<string | null>(userFacePhoto || null);
@@ -65,8 +77,8 @@ export default function ProfileTab({
   // Sync state values if props change
   useEffect(() => {
     setEditedName(userName);
-    setEditedEmail(userEmail || "ofentsebatlang@gmail.com");
-    setEditedPhone(userPhone || "+27 82 456 7890");
+    setEditedEmail(userEmail || "");
+    setEditedPhone(userPhone || "");
     setEditedPin(userPin);
     setEditedStartingBalance(startingBalance);
     setCustomPhoto(userFacePhoto || null);
@@ -145,23 +157,40 @@ export default function ProfileTab({
       return;
     }
 
-    setIsSaving(true);
-    try {
-      await onUpdateProfile({
-        userName: editedName,
-        userEmail: editedEmail,
-        userPhone: editedPhone,
-        userPin: editedPin,
-        userFacePhoto: customPhoto || "",
-        startingBalance: editedStartingBalance
-      });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
-    } catch (err) {
-      console.error("Error saving profile details:", err);
-      setSaveError("Failed to update profile details. Please try again.");
-    } finally {
-      setIsSaving(false);
+    const isSensitiveCredentialChange = 
+      (editedPin !== userPin && editedPin.trim().length > 0) || 
+      (editedPhone !== userPhone && editedPhone.trim().length > 0);
+
+    const performSave = async () => {
+      setIsSaving(true);
+      try {
+        await onUpdateProfile({
+          userName: editedName,
+          userEmail: editedEmail,
+          userPhone: editedPhone,
+          userPin: editedPin,
+          userFacePhoto: customPhoto || "",
+          startingBalance: editedStartingBalance
+        });
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 4000);
+      } catch (err) {
+        console.error("Error saving profile details:", err);
+        setSaveError("Failed to update profile details. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (isSensitiveCredentialChange && onRequestBiometricVerification) {
+      onRequestBiometricVerification(
+        "Authorize Security Credential Update (Remote PIN / Contact Phone)",
+        () => {
+          performSave();
+        }
+      );
+    } else {
+      performSave();
     }
   };
 
@@ -330,7 +359,7 @@ export default function ProfileTab({
                     type="text"
                     value={editedName}
                     onChange={(e) => setEditedName(e.target.value)}
-                    placeholder="e.g. Ofentse Batlang"
+                    placeholder="e.g. John Doe"
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-capitec-blue outline-none text-slate-700 font-semibold"
                     required
                   />
@@ -374,7 +403,7 @@ export default function ProfileTab({
                     type="email"
                     value={editedEmail}
                     onChange={(e) => setEditedEmail(e.target.value)}
-                    placeholder="e.g. user@domain.com"
+                    placeholder="johndoe@email.com"
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-capitec-blue outline-none text-slate-700 font-semibold"
                   />
                 </div>
@@ -392,7 +421,7 @@ export default function ProfileTab({
                     type="text"
                     value={editedPhone}
                     onChange={(e) => setEditedPhone(e.target.value)}
-                    placeholder="e.g. +27 82 456 7890"
+                    placeholder="e.g. +27 78 697 6181"
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-capitec-blue outline-none text-slate-700 font-semibold"
                   />
                 </div>
@@ -448,29 +477,29 @@ export default function ProfileTab({
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">Date of Birth</span>
                   <span className="text-xs font-semibold text-slate-600 mt-0.5 flex items-center space-x-1">
                     <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span>June 15, 1994</span>
+                    <span>{dateOfBirth || "June 15, 1994"}</span>
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">SA National ID</span>
                   <span className="text-xs font-semibold text-slate-600 mt-0.5">
-                    940615 5123 08 1
+                    {idNumber || "940615 5123 08 1"}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">Account Number</span>
                   <span className="text-xs font-semibold text-slate-600 mt-0.5 flex items-center space-x-1">
                     <CreditCard className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span>1431289445</span>
+                    <span>{accountNumber || "1431289445"}</span>
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">Account Type</span>
-                  <span className="text-xs font-semibold text-slate-600 mt-0.5">Global One Account</span>
+                  <span className="text-xs font-semibold text-slate-600 mt-0.5">{accountType || "Global One Account"}</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">Enrollment Date</span>
-                  <span className="text-xs font-semibold text-slate-600 mt-0.5">July 1, 2026</span>
+                  <span className="text-xs font-semibold text-slate-600 mt-0.5">{enrollmentDate || "July 1, 2026"}</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-slate-400 uppercase">Verification Level</span>

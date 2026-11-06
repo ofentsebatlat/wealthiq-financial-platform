@@ -78,6 +78,16 @@ def calculate_similarity_and_match(distance: float, threshold: float = 0.6):
         similarity = max(0.0, 75.0 - ((distance - threshold) / threshold) * 75.0)
     return round(float(similarity), 2), bool(is_match)
 
+def compute_ear(eye_points):
+    if len(eye_points) < 6:
+        return 0.3
+    A = np.linalg.norm(np.array(eye_points[1]) - np.array(eye_points[5]))
+    B = np.linalg.norm(np.array(eye_points[2]) - np.array(eye_points[4]))
+    C = np.linalg.norm(np.array(eye_points[0]) - np.array(eye_points[3]))
+    if C == 0:
+        return 0.3
+    return float((A + B) / (2.0 * C))
+
 # Models
 class VerifyRequest(BaseModel):
     photo1_b64: str
@@ -91,7 +101,13 @@ class VerifyUserRequest(BaseModel):
 class EnrollUserRequest(BaseModel):
     username: str
     pin: str
+    photo_b64: Optional[str] = None
+    photos_b64: Optional[List[str]] = None
+
+class TrackFrameRequest(BaseModel):
     photo_b64: str
+    mode: Optional[str] = "verify"  # "verify" | "enroll"
+    target_username: Optional[str] = None
 
 @app.get("/")
 def health():
@@ -133,9 +149,10 @@ async def verify_two_faces(request: VerifyRequest):
     if not encs2:
         raise HTTPException(status_code=400, detail="No face detected in current camera frame. Please center your face in the camera.")
 
-    # Compute Euclidean distance
+    # Compute Euclidean distance using strict 0.45 tolerance from live_camera.py
     dist = float(np.linalg.norm(encs1[0] - encs2[0]))
-    similarity, is_match = calculate_similarity_and_match(dist, threshold=0.6)
+    similarity, _ = calculate_similarity_and_match(dist, threshold=0.45)
+    is_match = dist < 0.45
 
     advice = (
         "Facial vectors matched successfully."
@@ -200,8 +217,9 @@ async def verify_against_registered_user(request: VerifyUserRequest):
     distances = face_recognition.face_distance(stored_encs, live_enc)
     min_dist = float(distances.min()) if len(distances) > 0 else 1.0
 
-    # Submit module uses 0.45 threshold for live recognition
-    similarity, is_match = calculate_similarity_and_match(min_dist, threshold=0.55)
+    # Submit module uses strict < 0.45 threshold for live recognition
+    similarity, _ = calculate_similarity_and_match(min_dist, threshold=0.45)
+    is_match = min_dist < 0.45
 
     return {
         "username": matched_key,
@@ -259,8 +277,10 @@ async def identify_user_from_stream(request: IdentifyRequest):
             best_distance = min_distance
             best_user = db_username
 
-    threshold = 0.55
-    similarity, is_match = calculate_similarity_and_match(best_distance, threshold=threshold)
+    # Match submit-5b6d638a-3059-4128-a8f1-8fc2c40ebc38 live_camera.py strict tolerance (0.45)
+    threshold = 0.45
+    similarity, _ = calculate_similarity_and_match(best_distance, threshold=threshold)
+    is_match = best_distance < threshold
 
     if is_match and best_user:
         user_info = db[best_user]
@@ -277,43 +297,377 @@ async def identify_user_from_stream(request: IdentifyRequest):
             "is_match": True,
             "pin_required": bool(user_info.get("pin")),
             "pin_matched": pin_correct,
-            "advice": f"Face recognized: {best_user} ({similarity}% confidence)"
+            "advice": "Biometric identity verified."
         }
     else:
         return {
             "detected": True,
             "identified": False,
-            "username": "Unknown User",
+            "username": None,
             "distance": round(best_distance, 4),
             "similarity": similarity,
             "is_match": False,
-            "advice": f"Face not recognized in registered profiles (Closest match: {round(similarity, 1)}%)."
+            "advice": "We could not recognize your face in our banking records. If you are new, please Sign Up to open an account."
         }
+
+
+@app.post("/track-frame")
+async def track_live_frame(request: TrackFrameRequest):
+    if not request.photo_b64:
+        raise HTTPException(status_code=400, detail="Frame is required.")
+
+    try:
+        clean_b64 = request.photo_b64.split(",")[1] if "," in request.photo_b64 else request.photo_b64
+        pil_img = Image.open(io.BytesIO(base64.b64decode(clean_b64))).convert("RGB")
+        # Resize to max 400px wide for fast real-time HOG tracking (same principle as live_camera.py)
+        if pil_img.width > 400:
+            ratio = 400.0 / float(pil_img.width)
+            pil_img = pil_img.resize((400, max(1, int(pil_img.height * ratio))), Image.Resampling.BILINEAR)
+        img_arr = np.array(pil_img)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid camera frame: {e}")
+
+    h, w, _ = img_arr.shape
+    gray = 0.299 * img_arr[:, :, 0] + 0.587 * img_arr[:, :, 1] + 0.114 * img_arr[:, :, 2]
+    mean_lum = float(np.mean(gray))
+    glare_pct = float(np.mean(gray > 245))
+
+    if h > 4 and w > 4:
+        lap = (
+            gray[:-2, 1:-1]
+            + gray[2:, 1:-1]
+            + gray[1:-1, :-2]
+            + gray[1:-1, 2:]
+            - 4.0 * gray[1:-1, 1:-1]
+        )
+        sharpness = float(np.var(lap))
+    else:
+        sharpness = 100.0
+
+    locations = face_recognition.face_locations(img_arr, model="hog")
+
+    if len(locations) == 0:
+        if mean_lum < 58:
+            return {
+                "face_detected": False,
+                "faces_count": 0,
+                "in_place": False,
+                "status": "too_dark",
+                "lighting": "dim",
+                "distance_status": "none",
+                "brightness": round(mean_lum, 1),
+                "box": None,
+                "identified": False,
+                "username": None,
+                "advice": "Too dark to detect your face. Move to an area with more light."
+            }
+        if mean_lum > 228 or glare_pct > 0.38:
+            return {
+                "face_detected": False,
+                "faces_count": 0,
+                "in_place": False,
+                "status": "glare",
+                "lighting": "harsh",
+                "distance_status": "none",
+                "brightness": round(mean_lum, 1),
+                "box": None,
+                "identified": False,
+                "username": None,
+                "advice": "Strong glare or backlighting detected. Avoid bright light directly behind you."
+            }
+        return {
+            "face_detected": False,
+            "faces_count": 0,
+            "in_place": False,
+            "status": "no_face",
+            "lighting": "good",
+            "distance_status": "none",
+            "brightness": round(mean_lum, 1),
+            "box": None,
+            "identified": False,
+            "username": None,
+            "advice": "Position your face inside the camera frame. If you are far back, move closer."
+        }
+
+    if len(locations) > 1:
+        # Return largest face box for visual feedback
+        largest = max(locations, key=lambda b: (b[2] - b[0]) * (b[1] - b[3]))
+        top, right, bottom, left = largest
+        return {
+            "face_detected": True,
+            "faces_count": len(locations),
+            "in_place": False,
+            "status": "multiple_faces",
+            "lighting": "good",
+            "distance_status": "good",
+            "brightness": round(mean_lum, 1),
+            "box": {
+                "top": round(top / h, 4),
+                "right": round(right / w, 4),
+                "bottom": round(bottom / h, 4),
+                "left": round(left / w, 4)
+            },
+            "identified": False,
+            "username": None,
+            "advice": "Multiple faces detected. Ensure only you are visible in the frame."
+        }
+
+    top, right, bottom, left = locations[0]
+    norm_box = {
+        "top": round(top / h, 4),
+        "right": round(right / w, 4),
+        "bottom": round(bottom / h, 4),
+        "left": round(left / w, 4)
+    }
+
+    face_h_ratio = (bottom - top) / float(h)
+    face_w_ratio = (right - left) / float(w)
+    cx = ((left + right) / 2.0) / float(w)
+    cy = ((top + bottom) / 2.0) / float(h)
+
+    face_crop = gray[max(0, top):min(h, bottom), max(0, left):min(w, right)]
+    face_lum = float(np.mean(face_crop)) if face_crop.size > 0 else mean_lum
+    face_contrast = float(np.std(face_crop)) if face_crop.size > 0 else 30.0
+
+    # 1. Check lighting on the face
+    if face_lum < 62 or (mean_lum < 50 and face_lum < 72):
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "too_dark",
+            "lighting": "dim",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Lighting on your face is too dim. Move to an area with more light."
+        }
+
+    if face_lum > 235 or (glare_pct > 0.42 and face_contrast < 20):
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "glare",
+            "lighting": "harsh",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Harsh glare detected on your face. Step out of direct bright light."
+        }
+
+    # 2. Check distance (too far or too close)
+    if face_h_ratio < 0.25 or face_w_ratio < 0.18:
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "too_far",
+            "lighting": "good",
+            "distance_status": "too_far",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "You are too far from the camera. Move closer so your face can be recognized."
+        }
+
+    if face_h_ratio > 0.78 or top <= 2 or bottom >= h - 2:
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "too_close",
+            "lighting": "good",
+            "distance_status": "too_close",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "You are too close to the camera. Move slightly back so your full face is visible."
+        }
+
+    # 3. Check centering
+    if cx < 0.27 or cx > 0.73 or cy < 0.19 or cy > 0.81:
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "off_center",
+            "lighting": "good",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Center your face inside the camera guide and look straight ahead."
+        }
+
+    # 4. Check motion blur
+    if sharpness < 16.0:
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "blurry",
+            "lighting": "good",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Hold still — slight camera blur detected."
+        }
+
+    # Face is in place! Extract 128-D deep metric encoding
+    encs = face_recognition.face_encodings(img_arr, locations)
+    if not encs:
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": False,
+            "status": "no_landmarks",
+            "lighting": "good",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Keep your face unobstructed and look directly at the camera."
+        }
+
+    if (request.mode or "verify") == "enroll":
+        return {
+            "face_detected": True,
+            "faces_count": 1,
+            "in_place": True,
+            "status": "in_place",
+            "lighting": "good",
+            "distance_status": "good",
+            "brightness": round(face_lum, 1),
+            "box": norm_box,
+            "identified": False,
+            "username": None,
+            "advice": "Face in position — hold still for automatic capture..."
+        }
+
+    # Verification mode: compare against user_database.pkl using live_camera.py strict 0.45 tolerance
+    live_enc = encs[0]
+    db = load_database()
+    best_user = None
+    best_distance = 1.0
+    threshold = 0.45
+
+    if request.target_username and db:
+        for db_username, db_data in db.items():
+            u_clean = db_username.strip().lower()
+            t_clean = request.target_username.strip().lower()
+            if u_clean == t_clean or t_clean in u_clean or u_clean in t_clean:
+                stored_encs = db_data.get("encodings", [])
+                if stored_encs:
+                    dists = face_recognition.face_distance(stored_encs, live_enc)
+                    best_distance = float(dists.min()) if len(dists) > 0 else 1.0
+                    best_user = db_username
+                break
+    elif db:
+        for db_username, db_data in db.items():
+            stored_encs = db_data.get("encodings", [])
+            if not stored_encs:
+                continue
+            dists = face_recognition.face_distance(stored_encs, live_enc)
+            min_d = float(dists.min()) if len(dists) > 0 else 1.0
+            if min_d < best_distance:
+                best_distance = min_d
+                best_user = db_username
+
+    similarity, _ = calculate_similarity_and_match(best_distance, threshold=threshold)
+    identified = bool(best_user and best_distance < threshold)
+
+    # Security Measure 4: Biometric Liveness Detection (Anti-Spoofing & Eye Blink Tracking)
+    landmarks_list = face_recognition.face_landmarks(img_arr, locations)
+    blink_detected = False
+    ear_score = 0.3
+    if landmarks_list:
+        lm = landmarks_list[0]
+        left_eye = lm.get("left_eye", [])
+        right_eye = lm.get("right_eye", [])
+        if left_eye and right_eye:
+            left_ear = compute_ear(left_eye)
+            right_ear = compute_ear(right_eye)
+            ear_score = round(float((left_ear + right_ear) / 2.0), 3)
+            if ear_score < 0.22:
+                blink_detected = True
+
+    live_texture = bool(face_contrast > 16.0 and sharpness > 16.0)
+
+    # Give live recognition-aware coaching if not yet matching and slightly far or borderline lit
+    coaching_hint = None
+    if not identified:
+        if face_h_ratio < 0.34:
+            coaching_hint = "Move slightly closer to the camera so facial details are clearer."
+        elif face_lum < 88:
+            coaching_hint = "Face a brighter light source so we can verify your features clearly."
+
+    return {
+        "face_detected": True,
+        "faces_count": 1,
+        "in_place": True,
+        "status": "in_place",
+        "lighting": "good",
+        "distance_status": "good",
+        "brightness": round(face_lum, 1),
+        "box": norm_box,
+        "identified": identified,
+        "username": best_user if identified else None,
+        "distance": round(best_distance, 4),
+        "similarity": similarity,
+        "coaching_hint": coaching_hint,
+        "advice": coaching_hint or "Face in position — hold steady while we verify your identity...",
+        "liveness": {
+            "is_live": live_texture,
+            "blink_detected": blink_detected,
+            "ear": ear_score,
+            "live_texture": live_texture
+        }
+    }
 
 
 @app.post("/enroll")
 async def enroll_user(request: EnrollUserRequest):
-    if not request.username or not request.pin or not request.photo_b64:
-        raise HTTPException(status_code=400, detail="Username, PIN, and photo are required.")
+    raw_photos: List[str] = []
+    if request.photos_b64:
+        raw_photos.extend([p for p in request.photos_b64 if p])
+    if request.photo_b64 and request.photo_b64 not in raw_photos:
+        raw_photos.append(request.photo_b64)
 
-    try:
-        img_arr = base64_to_rgb_array(request.photo_b64)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid photo format: {e}")
+    if not request.username or not request.pin or not raw_photos:
+        raise HTTPException(status_code=400, detail="Username, PIN, and at least one photo are required.")
 
-    encs = face_recognition.face_encodings(img_arr)
-    if not encs:
+    extracted_encs = []
+    for p_b64 in raw_photos:
+        try:
+            img_arr = base64_to_rgb_array(p_b64)
+            encs = face_recognition.face_encodings(img_arr)
+            if encs:
+                extracted_encs.append(encs[0])
+        except Exception:
+            continue
+
+    if not extracted_encs:
         raise HTTPException(status_code=400, detail="No face detected in provided photo. Please provide a clear face image.")
 
     db = load_database()
     if request.username in db and "encodings" in db[request.username]:
-        # Append encoding
-        db[request.username]["encodings"].append(encs[0])
+        db[request.username]["encodings"].extend(extracted_encs)
         db[request.username]["pin"] = request.pin
     else:
         db[request.username] = {
             "pin": request.pin,
-            "encodings": [encs[0]]
+            "encodings": extracted_encs
         }
 
     save_database(db)
@@ -416,7 +770,7 @@ def get_models_status():
             "status": "active",
             "registered_users": list(db.keys()),
             "users_count": len(db),
-            "threshold": 0.55
+            "threshold": 0.45
         },
         "cnn_image_classifiers": {
             "name": "Pretrained PyTorch CNN Models",

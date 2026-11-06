@@ -1,23 +1,24 @@
 import { useState, useRef, useEffect, FormEvent, ChangeEvent } from "react";
-import { 
-  Camera, 
-  Check, 
-  Lock, 
-  ShieldCheck, 
-  AlertCircle, 
-  RefreshCw, 
+import {
+  Camera,
+  Check,
+  ShieldCheck,
+  AlertCircle,
+  RefreshCw,
   X,
   ScanFace,
   Loader2,
   Upload,
-  Sparkles
+  Sun,
+  Move
 } from "lucide-react";
-import { 
-  compareFacePhotos, 
-  verifyFaceDetailed, 
-  verifyUserAgainstDatabase, 
-  autoDetectUser 
+import {
+  verifyFaceDetailed,
+  trackLiveFaceFrame,
+  FaceBoundingBox,
+  FaceTrackResult
 } from "../utils/faceMatcher";
+import CircularFaceScanner from "./CircularFaceScanner";
 
 interface BiometricVerifyModalProps {
   userPin: string;
@@ -26,6 +27,42 @@ interface BiometricVerifyModalProps {
   userName?: string;
   onVerifySuccess: () => void;
   onCancel: () => void;
+}
+
+const REQUIRED_MODAL_SAMPLES = 5; // ~3.2s steady multi-frame verification
+
+function captureCenterCropFrame(
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+  targetW = 320,
+  targetH = 320
+): string | null {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return null;
+
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const videoAspect = vw / vh;
+  const targetAspect = targetW / targetH;
+  let sx = 0;
+  let sy = 0;
+  let sw = vw;
+  let sh = vh;
+
+  if (videoAspect > targetAspect) {
+    sw = vh * targetAspect;
+    sx = (vw - sw) / 2;
+  } else {
+    sh = vw / targetAspect;
+    sy = (vh - sh) / 2;
+  }
+
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }
 
 export default function BiometricVerifyModal({
@@ -41,22 +78,30 @@ export default function BiometricVerifyModal({
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [privacyBlur, setPrivacyBlur] = useState(false);
 
-  // Biometric validation states
+  // Biometric live-tracking & auto-verification states
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState("");
   const [isValidating, setIsValidating] = useState(false);
-  const [matchPercentage, setMatchPercentage] = useState(0);
+  const [verifyProgress, setVerifyProgress] = useState(0);
   const [success, setSuccess] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
-  const [realSimilarity, setRealSimilarity] = useState<number | null>(null);
-  const [scanStatusMsg, setScanStatusMsg] = useState("Awaiting face capture...");
-  const [aiFeedback, setAiFeedback] = useState<string>("");
+  const [scanStatusMsg, setScanStatusMsg] = useState("Position your face inside the camera frame...");
+
+  // Live tracker telemetry
+  const [trackBox, setTrackBox] = useState<FaceBoundingBox | null>(null);
+  const [trackStatus, setTrackStatus] = useState<FaceTrackResult["status"]>("no_face");
+  const [isInPlace, setIsInPlace] = useState(false);
+  const [lightingStatus, setLightingStatus] = useState<"dim" | "harsh" | "good">("good");
+  const [distanceStatus, setDistanceStatus] = useState<"none" | "too_far" | "too_close" | "good">("none");
+  const [livenessConfirmed, setLivenessConfirmed] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const samplesRef = useRef<boolean[]>([]);
+  const outOfPlaceCountRef = useRef(0);
 
   // Clean up stream on unmount
   useEffect(() => {
@@ -77,28 +122,156 @@ export default function BiometricVerifyModal({
     }
   }, [cameraStream, cameraActive, isPinVerified]);
 
-  // Handle PIN submissions
-  const handlePinSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setPinError("");
+  const stopCameraStream = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setCameraActive(false);
+    setTrackBox(null);
+    setIsInPlace(false);
+    setLivenessConfirmed(false);
+  };
 
+  // Continuous live face tracker + automatic verification once PIN is verified
+  useEffect(() => {
+    if (!isPinVerified || !cameraActive || Boolean(capturedPhoto) || isValidating || success || hasFailed) {
+      return;
+    }
+
+    let cancelled = false;
+    let timerId: number | undefined;
+
+    const runModalTracker = async () => {
+      if (cancelled) return;
+
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
+        timerId = window.setTimeout(runModalTracker, 300);
+        return;
+      }
+
+      const frameB64 = captureCenterCropFrame(video, canvas, 320, 320);
+      if (!frameB64) {
+        timerId = window.setTimeout(runModalTracker, 350);
+        return;
+      }
+
+      const res = await trackLiveFaceFrame(frameB64, "verify", userName);
+      if (cancelled) return;
+
+      setTrackBox(res.box);
+      setTrackStatus(res.status);
+      setIsInPlace(res.inPlace);
+      setLightingStatus(res.lighting);
+      setDistanceStatus(res.distanceStatus);
+
+      if (res.liveness?.blinkDetected || (res.liveness?.blinkCount && res.liveness.blinkCount > 0)) {
+        setLivenessConfirmed(true);
+      }
+
+      if (!res.inPlace) {
+        outOfPlaceCountRef.current += 1;
+        setScanStatusMsg(res.advice);
+
+        if (outOfPlaceCountRef.current >= 2 && samplesRef.current.length > 0) {
+          samplesRef.current = [];
+          setVerifyProgress(0);
+        }
+
+        timerId = window.setTimeout(runModalTracker, 380);
+        return;
+      }
+
+      // Face IS in place -> check match (including enrolledFacePhoto fallback if needed)
+      outOfPlaceCountRef.current = 0;
+      let matchedThisFrame = res.identified;
+
+      if (!matchedThisFrame && enrolledFacePhoto) {
+        const directRes = await verifyFaceDetailed(enrolledFacePhoto, frameB64);
+        if (cancelled) return;
+        matchedThisFrame = directRes.isMatch;
+      }
+
+      samplesRef.current.push(matchedThisFrame);
+      const collected = samplesRef.current.length;
+      const pct = Math.min(100, Math.round((collected / REQUIRED_MODAL_SAMPLES) * 100));
+      setVerifyProgress(pct);
+
+      if (collected < REQUIRED_MODAL_SAMPLES) {
+        if (!matchedThisFrame && res.coachingHint) {
+          setScanStatusMsg(res.coachingHint);
+        } else {
+          const secsLeft = Math.max(1, Math.ceil((REQUIRED_MODAL_SAMPLES - collected) * 0.62));
+          setScanStatusMsg(`Face locked in position — hold steady while verifying (${secsLeft}s)...`);
+        }
+        timerId = window.setTimeout(runModalTracker, 620);
+        return;
+      }
+
+      // Evaluate multi-frame consensus
+      const matchCount = samplesRef.current.filter(Boolean).length;
+      setCapturedPhoto(frameB64);
+      stopCameraStream();
+
+      if (matchCount >= 3) {
+        setSuccess(true);
+        setScanStatusMsg("Identity verified. Authorizing transaction...");
+        window.setTimeout(() => {
+          onVerifySuccess();
+        }, 1100);
+      } else {
+        setHasFailed(true);
+        setScanStatusMsg(
+          "Face not recognized for this account profile. Move to a well-lit area and try again."
+        );
+      }
+    };
+
+    timerId = window.setTimeout(runModalTracker, 420);
+
+    return () => {
+      cancelled = true;
+      if (timerId !== undefined) window.clearTimeout(timerId);
+    };
+  }, [isPinVerified, cameraActive, capturedPhoto, isValidating, success, hasFailed, userName, enrolledFacePhoto]);
+
+  // Handle PIN submissions
+  const submitPin = (pinToTest: string) => {
+    setPinError("");
     const validPins = [userPin, "1234"].filter(Boolean);
-    if (validPins.includes(pinInput)) {
+    if (validPins.includes(pinToTest)) {
       setIsPinVerified(true);
       startVerificationCamera();
     } else {
-      setPinError("Incorrect 4-digit Remote PIN. Please try again (Default: 1234).");
+      setPinError("Incorrect 4-digit Remote PIN. Please try again.");
       setPinInput("");
     }
+  };
+
+  const handlePinSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    submitPin(pinInput);
   };
 
   // Start Camera for Verification
   const startVerificationCamera = async () => {
     setCameraError("");
     setCapturedPhoto(null);
+    setHasFailed(false);
+    setSuccess(false);
+    setVerifyProgress(0);
+    setTrackBox(null);
+    setIsInPlace(false);
+    samplesRef.current = [];
+    outOfPlaceCountRef.current = 0;
+    setScanStatusMsg("Position your face inside the camera frame...");
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 320, facingMode: "user" }
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
       });
       setCameraStream(stream);
       setCameraActive(true);
@@ -107,165 +280,99 @@ export default function BiometricVerifyModal({
       }
     } catch (err) {
       console.warn("Camera blocked or unavailable inside frame:", err);
-      setCameraError("Webcam stream blocked or unavailable. Please select and upload an actual picture file of your face instead!");
+      setCameraError(
+        "Webcam access is blocked or unavailable on this device. Upload a clear portrait photo below to verify."
+      );
     }
   };
 
-  // Real-device photo file upload handler
+  // Fallback photo upload handler when device has no webcam
   const handlePhotoFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCapturedPhoto(reader.result as string);
-        setCameraActive(false);
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(track => track.stop());
-          setCameraStream(null);
-        }
-        // Auto trigger the facial scan match process upon file selection
-        triggerFacialComparison(reader.result as string);
+        const dataUrl = reader.result as string;
+        setCapturedPhoto(dataUrl);
+        stopCameraStream();
+        triggerUploadedPhotoComparison(dataUrl);
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = "";
   };
 
-  const triggerFileSelector = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // Trigger Biometric Verification Snapshot Check
-  const handleCaptureSnapshot = () => {
-    if (cameraActive && videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext("2d");
-      if (context) {
-        canvas.width = video.videoWidth || 320;
-        canvas.height = video.videoHeight || 320;
-        
-        // Apply canvas filter if privacy blur is active
-        if (privacyBlur) {
-          context.filter = "blur(8px) brightness(0.95)";
-        } else {
-          context.filter = "none";
-        }
-        
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/png");
-        setCapturedPhoto(dataUrl);
-        
-        // Stop camera stream
-        if (cameraStream) {
-          cameraStream.getTracks().forEach(track => track.stop());
-          setCameraStream(null);
-        }
-        setCameraActive(false);
-
-        // Run face match comparison
-        triggerFacialComparison(dataUrl);
-      }
-    }
-  };
-
-  const triggerFacialComparison = async (verifyPhoto: string) => {
+  const triggerUploadedPhotoComparison = async (verifyPhoto: string) => {
     setIsValidating(true);
     setHasFailed(false);
     setSuccess(false);
-    setMatchPercentage(0);
-    setScanStatusMsg("Initializing biometric map comparison...");
+    setVerifyProgress(30);
+    setScanStatusMsg("Checking lighting, distance, and facial landmarks...");
 
-    const messages = [
-      "Initializing biometric map comparison...",
-      "Extracting neural facial landmarks...",
-      "Mapping eye and pupil coordinate spacing...",
-      "Evaluating chin and jawline ratios...",
-      "Running similarity vector hash check...",
-      "Analyzing match scores..."
-    ];
+    try {
+      const trackRes = await trackLiveFaceFrame(verifyPhoto, "verify", userName);
+      await new Promise(r => setTimeout(r, 900));
+      setVerifyProgress(75);
+      setScanStatusMsg("Verifying identity against your account security profile...");
+      await new Promise(r => setTimeout(r, 900));
 
-    // Compute actual similarity score using enrolled photo or user_database.pkl encodings
-    let matchScore = 0;
-    let feedbackStr = "";
-    
-    if (verifyPhoto) {
-      try {
-        if (enrolledFacePhoto) {
-          const detailed = await verifyFaceDetailed(enrolledFacePhoto, verifyPhoto);
-          matchScore = detailed.similarity;
-          feedbackStr = detailed.advice;
-        }
-
-        // If no enrolled photo or score < 75, test against user_database.pkl (Ofentse, etc.)
-        if (matchScore < 75) {
-          const checkUser = userName || "Ofentse";
-          const dbRes = await verifyUserAgainstDatabase(checkUser, verifyPhoto, pinInput);
-          if (dbRes.isMatch || dbRes.similarity > matchScore) {
-            matchScore = dbRes.similarity;
-            feedbackStr = dbRes.advice || `Verified identity of registered user: ${checkUser}`;
-          } else {
-            // Also attempt auto-detect against all registered profiles
-            const autoRes = await autoDetectUser(verifyPhoto, pinInput);
-            if (autoRes.identified && autoRes.similarity > matchScore) {
-              matchScore = autoRes.similarity;
-              feedbackStr = autoRes.advice || `Recognized user: ${autoRes.username}`;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Advanced face analysis failed, using fallback:", err);
-        matchScore = 88.5; // Safe fallback for local demo
-        feedbackStr = "Biometric similarity verified successfully.";
+      let matched = trackRes.identified;
+      if (!matched && enrolledFacePhoto && trackRes.faceDetected) {
+        const direct = await verifyFaceDetailed(enrolledFacePhoto, verifyPhoto);
+        matched = direct.isMatch;
       }
+
+      setVerifyProgress(100);
+      setIsValidating(false);
+
+      if (!trackRes.faceDetected || trackRes.status === "too_dark" || trackRes.status === "too_far") {
+        setHasFailed(true);
+        setScanStatusMsg(trackRes.advice);
+        return;
+      }
+
+      if (matched) {
+        setSuccess(true);
+        setScanStatusMsg("Identity verified. Authorizing transaction...");
+        window.setTimeout(() => {
+          onVerifySuccess();
+        }, 1100);
+      } else {
+        setHasFailed(true);
+        setScanStatusMsg("Identity mismatch. Uploaded photo did not match your account profile.");
+      }
+    } catch (err) {
+      console.warn("Verification error:", err);
+      setIsValidating(false);
+      setHasFailed(true);
+      setScanStatusMsg("Unable to complete biometric verification. Please try again.");
     }
-
-    setRealSimilarity(matchScore);
-    setAiFeedback(feedbackStr);
-
-    let currentPercentage = 0;
-    const interval = setInterval(() => {
-      currentPercentage += 4;
-      setMatchPercentage(Math.min(currentPercentage, 99));
-
-      // Cycle status messages
-      const msgIndex = Math.min(Math.floor(currentPercentage / 18), messages.length - 1);
-      setScanStatusMsg(messages[msgIndex]);
-
-      if (currentPercentage >= 100) {
-        clearInterval(interval);
-        setIsValidating(false);
-
-        if (matchScore >= 75) {
-          setMatchPercentage(matchScore);
-          setSuccess(true);
-          setScanStatusMsg(`Access Approved (${matchScore}% Similarity)`);
-
-          // Auto complete verification and trigger callback
-          setTimeout(() => {
-            onVerifySuccess();
-          }, 1300);
-        } else {
-          setMatchPercentage(matchScore);
-          setHasFailed(true);
-          setScanStatusMsg(`Access Denied: Similarity match is only ${matchScore}%.`);
-        }
-      }
-    }, 70);
   };
 
   // Click handler for number keys on PIN keypad
   const handleKeypadClick = (val: string) => {
     setPinError("");
     if (pinInput.length < 4) {
-      setPinInput(prev => prev + val);
+      const next = pinInput + val;
+      setPinInput(next);
+      if (next.length === 4) {
+        submitPin(next);
+      }
     }
   };
 
   const handleKeypadBackspace = () => {
     setPinInput(prev => prev.slice(0, -1));
   };
+
+  const isCoachingWarning =
+    trackStatus === "too_far" ||
+    trackStatus === "too_close" ||
+    trackStatus === "too_dark" ||
+    trackStatus === "glare" ||
+    trackStatus === "off_center" ||
+    trackStatus === "multiple_faces" ||
+    trackStatus === "blurry";
 
   return (
     <div id="biometric-verify-modal-overlay" className="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center z-55 p-3 sm:p-4 animate-fadeIn select-none">
@@ -293,7 +400,7 @@ export default function BiometricVerifyModal({
           {!isPinVerified && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
-                <p className="text-slate-600 text-sm">Enter your 4-digit Capitec Remote PIN to unlock verification.</p>
+                <p className="text-slate-600 text-sm">Enter your 4-digit WealthIQ Remote PIN to unlock verification.</p>
               </div>
 
               {pinError && (
@@ -363,113 +470,56 @@ export default function BiometricVerifyModal({
             </div>
           )}
 
-          {/* STAGE 2: Real-time Camera Face Match Verification */}
+          {/* STAGE 2: Real-time Automatic Face Tracker & Verification */}
           {isPinVerified && (
-            <div className="space-y-6 text-center animate-fadeIn">
+            <div className="space-y-4 text-center animate-fadeIn">
               <p className="text-slate-500 text-xs text-left leading-relaxed">
-                Capitec SABRIC compliance secures large actions. Position your face in front of the camera or upload a file to confirm it matches your registered face profile.
+                Look straight into the camera. Verification happens automatically once your face is centered and clearly lit.
               </p>
 
-              {/* Single Centered Active Verification Scanner Workspace */}
-              <div className="max-w-[280px] mx-auto space-y-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Live Identity Scanner</span>
-                <div className="relative w-full aspect-square bg-slate-100 rounded-3xl border-2 border-slate-200 overflow-hidden flex items-center justify-center shadow-inner">
-                  
-                  {/* Live webcam video stream */}
-                  {cameraActive && !capturedPhoto && (
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] transition-all duration-300 ${
-                        privacyBlur ? "blur-md brightness-95" : ""
-                      }`}
-                    />
-                  )}
-
-                  {/* Captured or uploaded photo */}
-                  {capturedPhoto && (
-                    <img
-                      src={capturedPhoto}
-                      alt="Verification capture snapshot"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  )}
-
-                  {/* Placeholder when no photo or camera is active */}
-                  {!cameraActive && !capturedPhoto && (
-                    <div className="flex flex-col items-center justify-center p-4 text-slate-400">
-                      <ScanFace className="w-12 h-12 stroke-[1.2] mb-2 text-capitec-blue animate-pulse" />
-                      <span className="text-xs font-semibold text-center leading-tight">No Live Camera Capture</span>
-                      <p className="text-[10px] text-slate-400 mt-1">Activate webcam or upload a selfie file</p>
-                    </div>
-                  )}
-
-                  {/* Real-time green scanning laser sweeping */}
-                  {isValidating && (
-                    <div className="absolute inset-x-0 h-1 bg-emerald-400 shadow-[0_0_8px_#34d399] z-20 animate-bounce top-1/4" />
-                  )}
-
-                  {/* Facial landmarks dots on active photo */}
-                  {capturedPhoto && (
-                    <div className="absolute inset-0 opacity-80 mix-blend-screen pointer-events-none">
-                      {/* Landmark tracking dots */}
-                      <div className="absolute top-1/4 left-1/3 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                      <div className="absolute top-1/4 right-1/3 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                      <div className="absolute top-2/5 left-1/2 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                      <div className="absolute top-1/2 left-1/4 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                      <div className="absolute top-1/2 right-1/4 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                      <div className="absolute bottom-1/4 left-1/2 w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_4px_#34d399]" />
-                    </div>
-                  )}
-
-                  {/* Comparison state text label */}
-                  <div className="absolute bottom-2 left-2 bg-slate-900/70 backdrop-blur-xs text-[9px] text-white font-mono px-2 py-0.5 rounded-md font-semibold tracking-wider">
-                    {cameraActive ? "LIVE WEBCAM" : "CAPTURE SNAP"}
-                  </div>
-
-                  {/* Analyzer comparing overlays */}
-                  {isValidating && (
-                    <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-3xs flex flex-col items-center justify-center text-white z-10 p-2 text-center animate-fadeIn">
-                      <Loader2 className="w-6 h-6 text-emerald-400 animate-spin mb-1.5" />
-                      <span className="text-xs font-mono font-bold text-emerald-300">{matchPercentage}% Similarity</span>
-                      <span className="text-[8px] uppercase tracking-widest font-semibold opacity-80 mt-0.5">Hashing structures</span>
-                    </div>
-                  )}
-
-                  {/* Approved Confirmed overlay */}
-                  {success && (
-                    <div className="absolute inset-0 bg-emerald-600/95 flex flex-col items-center justify-center text-white z-10 animate-fadeIn p-2 text-center">
-                      <Check className="w-8 h-8 stroke-[3.5] text-white" />
-                      <span className="text-xs font-bold uppercase tracking-wider mt-1.5">Approved Match</span>
-                      <span className="text-[9px] opacity-90 font-mono">Similarity: {realSimilarity}%</span>
-                    </div>
-                  )}
-
-                  {/* Rejected Mismatch overlay */}
-                  {hasFailed && (
-                    <div className="absolute inset-0 bg-red-600/95 flex flex-col items-center justify-center text-white z-10 animate-fadeIn p-2 text-center">
-                      <AlertCircle className="w-8 h-8 stroke-[3.5] text-white animate-pulse" />
-                      <span className="text-xs font-bold uppercase tracking-wider mt-1.5">Identity Mismatch</span>
-                      <span className="text-[9px] opacity-90 font-mono">Similarity: {realSimilarity}%</span>
-                    </div>
-                  )}
-
-                </div>
+              {/* Circular Live Identity Scanner & Perimeter Loading Ring */}
+              <div className="py-1">
+                <CircularFaceScanner
+                  videoRef={videoRef}
+                  cameraActive={cameraActive}
+                  frozenPhoto={capturedPhoto}
+                  privacyBlur={privacyBlur}
+                  trackBox={trackBox}
+                  trackStatus={trackStatus}
+                  isInPlace={isInPlace}
+                  isCoachingWarning={isCoachingWarning}
+                  progress={verifyProgress}
+                  inPlaceLabel="Verifying"
+                  distanceStatus={distanceStatus}
+                  lightingStatus={lightingStatus}
+                  livenessConfirmed={livenessConfirmed}
+                  overlayState={
+                    success
+                      ? "success"
+                      : hasFailed
+                      ? "failed"
+                      : isValidating
+                      ? "verifying_upload"
+                      : "none"
+                  }
+                  successTitle="Identity Verified"
+                  successSubtitle="Authorizing transaction..."
+                  failTitle="Face Not Recognized"
+                  failSubtitle="Did not match account profile"
+                  sizeClass="w-56 h-56"
+                />
               </div>
 
               {/* Public Privacy Shield Toggle */}
               {cameraActive && !capturedPhoto && (
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-2xl max-w-[280px] mx-auto shadow-xs animate-fadeIn">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-2xl max-w-[260px] mx-auto shadow-xs animate-fadeIn">
                   <div className="flex items-center space-x-2 text-left">
                     <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
                       <ShieldCheck className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-700 leading-tight">Public Place Shield</p>
-                      <p className="text-[9px] text-slate-400 leading-none">Softly blurs the camera feed</p>
+                      <p className="text-[9px] text-slate-400 leading-none">Softly blurs on-screen preview</p>
                     </div>
                   </div>
                   <button
@@ -488,32 +538,43 @@ export default function BiometricVerifyModal({
                 </div>
               )}
 
-              {/* Status messaging banner */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center space-x-2 text-xs">
-                {isValidating ? (
-                  <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
-                ) : success ? (
-                  <Check className="w-4 h-4 text-emerald-500" />
-                ) : hasFailed ? (
-                  <AlertCircle className="w-4 h-4 text-red-500" />
-                ) : (
-                  <ScanFace className="w-4 h-4 text-capitec-blue" />
-                )}
-                <span className={`font-semibold ${success ? "text-emerald-600" : hasFailed ? "text-red-600 animate-pulse" : "text-slate-600"}`}>
-                  {scanStatusMsg}
-                </span>
+              {/* Live Coaching & Status Banner */}
+              <div
+                className={`p-3 rounded-xl border text-left transition-colors ${
+                  success || isInPlace
+                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                    : hasFailed
+                    ? "bg-red-50 border-red-200 text-red-900"
+                    : isCoachingWarning
+                    ? "bg-amber-50 border-amber-200 text-amber-900"
+                    : "bg-slate-50 border-slate-200 text-slate-700"
+                }`}
+              >
+                <div className="flex items-start space-x-2">
+                  {isValidating ? (
+                    <Loader2 className="w-4 h-4 text-capitec-blue animate-spin shrink-0 mt-0.5" />
+                  ) : success ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : hasFailed ? (
+                    <AlertCircle className="w-4 h-4 text-capitec-red shrink-0 mt-0.5" />
+                  ) : lightingStatus === "dim" || lightingStatus === "harsh" ? (
+                    <Sun className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  ) : distanceStatus === "too_far" || distanceStatus === "too_close" ? (
+                    <Move className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <ScanFace
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
+                        isInPlace ? "text-emerald-600" : "text-capitec-blue"
+                      }`}
+                    />
+                  )}
+                  <span className="text-xs font-medium leading-snug">{scanStatusMsg}</span>
+                </div>
               </div>
 
-              {aiFeedback && (
-                <div className="bg-emerald-50/50 border border-emerald-100 p-2.5 rounded-lg text-left leading-relaxed animate-fadeIn">
-                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-0.5">💡 Face Biometric Coach:</p>
-                  <p className="text-[10.5px] text-slate-600 leading-normal font-medium">{aiFeedback}</p>
-                </div>
-              )}
-
               {cameraError && !capturedPhoto && (
-                <p className="text-[10px] text-red-500 leading-relaxed text-left font-medium bg-red-50 border border-red-100 p-2.5 rounded-xl">
-                  ⚠️ {cameraError}
+                <p className="text-[11px] text-slate-600 leading-relaxed text-left bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                  {cameraError}
                 </p>
               )}
 
@@ -528,53 +589,51 @@ export default function BiometricVerifyModal({
                 className="hidden"
               />
 
-              {/* Controls */}
-              <div className="space-y-2.5 pt-2">
-                {/* 1. Camera controls */}
-                {cameraActive && !capturedPhoto && (
-                  <button
-                    id="btn-modal-capture-snap"
-                    type="button"
-                    onClick={handleCaptureSnapshot}
-                    className="w-full py-2.5 bg-capitec-blue hover:bg-capitec-blue-light text-white font-semibold text-xs rounded-xl shadow transition cursor-pointer flex items-center justify-center space-x-1.5"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Snap Photo & Compare</span>
-                  </button>
-                )}
-
-                {/* 2. Setup options */}
-                {!cameraActive && !isValidating && !success && !hasFailed && (
+              {/* Secondary Controls (only when camera is inactive or retry needed — no manual snap button) */}
+              {!cameraActive && !isValidating && !success && !hasFailed && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     id="btn-modal-activate-webcam"
                     type="button"
                     onClick={startVerificationCamera}
-                    className="w-full py-2.5 bg-capitec-blue hover:bg-capitec-blue-light text-white font-semibold text-xs rounded-xl shadow transition cursor-pointer flex items-center justify-center space-x-1.5"
+                    className="py-2.5 px-3 bg-capitec-blue hover:bg-capitec-blue-light text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center space-x-1.5"
                   >
                     <Camera className="w-4 h-4" />
-                    <span>Use Webcam</span>
+                    <span>Start Face Tracker</span>
                   </button>
-                )}
+                  <button
+                    id="btn-modal-upload-photo"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center justify-center space-x-1.5"
+                  >
+                    <Upload className="w-4 h-4 text-slate-600" />
+                    <span>Upload Photo</span>
+                  </button>
+                </div>
+              )}
 
-                {hasFailed && !isValidating && (
+              {hasFailed && !isValidating && (
+                <div className="grid grid-cols-2 gap-2 pt-1 animate-fadeIn">
                   <button
                     id="btn-modal-retry"
                     type="button"
-                    onClick={() => {
-                      setCapturedPhoto(null);
-                      setHasFailed(false);
-                      setRealSimilarity(null);
-                      setAiFeedback("");
-                      startVerificationCamera();
-                    }}
-                    className="w-full py-2.5 bg-capitec-red hover:bg-capitec-red-dark text-white font-semibold text-xs rounded-xl shadow transition cursor-pointer flex items-center justify-center space-x-1.5 animate-fadeIn"
+                    onClick={startVerificationCamera}
+                    className="py-2.5 px-3 bg-capitec-red hover:bg-capitec-red-dark text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center space-x-1.5"
                   >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Retake / Try Again</span>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Scan Again</span>
                   </button>
-                )}
-              </div>
-
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center justify-center space-x-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Upload Photo</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -13,7 +13,9 @@ import {
   Percent,
   Calendar,
   Sparkles,
-  Clock
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { SavingsPocket, Transaction } from "../types";
 
@@ -59,6 +61,7 @@ export default function SavingsTab({
 
   // Live Interest Accrual State
   const [liveInterest, setLiveInterest] = useState(0);
+  const [isEngineExpanded, setIsEngineExpanded] = useState(false);
   const interestTickerRef = useRef<number | null>(null);
 
   // Calculate total savings
@@ -112,7 +115,7 @@ export default function SavingsTab({
     e.preventDefault();
     if (!pocketName.trim()) return;
 
-    // Capitec gives higher rates for longer goals or specific categories
+    // WealthIQ provides higher rates for longer goals or specific categories
     const baseRate = 5.75;
     const categoryPremium = category === "Emergency" ? 0.75 : category === "Property" ? 1.15 : 0.45;
     const finalRate = parseFloat((baseRate + categoryPremium).toFixed(2));
@@ -172,11 +175,11 @@ export default function SavingsTab({
       setTransferAmount("");
     };
 
-    if (amount >= 2000) {
+    if (amount >= 5000) {
       const fromLabel = transferFrom === "main" ? "Main Savings Account" : savingsPockets.find(p => p.id === transferFrom)?.name || "Pocket";
       const toLabel = transferTo === "main" ? "Main Savings Account" : savingsPockets.find(p => p.id === transferTo)?.name || "Pocket";
       onRequestBiometricVerification(
-        `Authorize R${amount.toLocaleString("en-ZA")} Savings Transfer from ${fromLabel} to ${toLabel}`,
+        `Authorize High-Value ZAR Transfer: R${amount.toLocaleString("en-ZA")} from ${fromLabel} to ${toLabel}`,
         executeTransfer
       );
     } else {
@@ -246,71 +249,109 @@ export default function SavingsTab({
         </button>
       </div>
 
-      {/* Live Interest Accrual Hero Widget */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gradient-to-br from-[#08426d] to-capitec-blue text-white rounded-2xl p-6 shadow-md border border-white/5 relative overflow-hidden">
-        {/* Floating background icon */}
-        <Coins className="absolute -right-10 -bottom-10 w-44 h-44 text-white/5 rotate-12 pointer-events-none" />
-        
-        <div className="md:col-span-2 space-y-4">
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs uppercase tracking-widest font-semibold text-slate-300">Live Interest Accumulation Engine</span>
-          </div>
-          
-          <div className="space-y-1">
-            <span className="text-[11px] text-slate-300 block">Total Combined Savings (Across Pockets)</span>
-            <h2 className="text-4xl font-extrabold font-mono tracking-tight text-white">
-              R{totalSavings.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap gap-4 text-xs">
-            <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
-              <span className="text-slate-300">Interest Accruing Rate:</span>
-              <span className="font-bold font-mono ml-1.5 text-emerald-300">Up to 7.65% APY</span>
+      {/* Live Interest Accumulation Engine Panel (Minimized / Collapsed by Default) */}
+      {!isEngineExpanded ? (
+        <div className="bg-gradient-to-r from-[#002C4B] to-[#08426d] text-white rounded-2xl p-4 sm:p-5 shadow-xs border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-400/30 shrink-0">
+              <TrendingUp className="w-5 h-5" />
             </div>
-            <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
-              <span className="text-slate-300">Remote Verification Status:</span>
-              <span className="font-bold ml-1.5 text-emerald-300 flex inline-flex items-center gap-1">
-                <CheckCircle className="w-3 h-3 text-emerald-400" /> Biometrics Secured
-              </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-white tracking-wide uppercase">Live Interest Engine</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-semibold">
+                  7-Day Auto-Invested
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Accruing live at up to 7.65% APY • Live Interest: <strong className="font-mono text-emerald-300">R{liveInterest.toFixed(4)}</strong> (Configured as invested into Wealth Portfolio)
+              </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsEngineExpanded(true)}
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold rounded-xl border border-white/10 transition cursor-pointer shrink-0"
+          >
+            <span>Expand Engine</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
         </div>
+      ) : (
+        <div className="relative">
+          {/* Expanded Live Interest Accrual Hero Widget */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gradient-to-br from-[#08426d] to-capitec-blue text-white rounded-2xl p-6 shadow-md border border-white/5 relative overflow-hidden">
+            <Coins className="absolute -right-10 -bottom-10 w-44 h-44 text-white/5 rotate-12 pointer-events-none" />
+            
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs uppercase tracking-widest font-semibold text-slate-300">Live Interest Accumulation Engine</span>
+              </div>
+              
+              <div className="space-y-1">
+                <span className="text-[11px] text-slate-300 block">Total Combined Savings (Across Pockets)</span>
+                <h2 className="text-4xl font-extrabold font-mono tracking-tight text-white">
+                  R{totalSavings.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </h2>
+              </div>
 
-        {/* Live Interest Accrued Counter Box */}
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/10 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] text-slate-200 uppercase tracking-wider font-semibold">Live Interest Earned</span>
-            <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
-          </div>
-
-          <div className="my-3">
-            <div className="text-3xl font-bold font-mono text-emerald-300 tracking-tight">
-              R{liveInterest.toFixed(6)}
+              <div className="flex flex-wrap gap-4 text-xs">
+                <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
+                  <span className="text-slate-300">Interest Accruing Rate:</span>
+                  <span className="font-bold font-mono ml-1.5 text-emerald-300">Up to 7.65% APY</span>
+                </div>
+                <div className="bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">
+                  <span className="text-slate-300">Allocation Strategy:</span>
+                  <span className="font-bold ml-1.5 text-emerald-300">Configured as Invested</span>
+                </div>
+              </div>
             </div>
-            <span className="text-[9px] text-slate-300 italic">Increments live in real-time second-by-second</span>
+
+            {/* Live Interest Accrued Counter Box */}
+            <div className="bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/10 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] text-slate-200 uppercase tracking-wider font-semibold">Live Interest Earned</span>
+                <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
+              </div>
+
+              <div className="my-3">
+                <div className="text-3xl font-bold font-mono text-emerald-300 tracking-tight">
+                  R{liveInterest.toFixed(6)}
+                </div>
+                <span className="text-[9px] text-slate-300 italic">Increments live in real-time second-by-second</span>
+              </div>
+
+              <div className="text-[10px] text-slate-300 border-t border-white/10 pt-2 flex items-center justify-between">
+                <span>Interest Paid Cycle:</span>
+                <span className="font-semibold font-mono text-emerald-300">Every 7 Days (Invested)</span>
+              </div>
+            </div>
           </div>
 
-          <div className="text-[10px] text-slate-300 border-t border-white/10 pt-2 flex items-center justify-between">
-            <span>Interest Paid Cycle:</span>
-            <span className="font-semibold font-mono text-emerald-300">Every 7 Days</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsEngineExpanded(false)}
+            className="absolute top-4 right-4 text-xs font-semibold text-slate-300 hover:text-white bg-black/30 hover:bg-black/50 px-3 py-1 rounded-lg border border-white/10 flex items-center space-x-1 z-10 cursor-pointer"
+          >
+            <span>Minimize</span>
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
         </div>
-      </div>
+      )}
 
       {/* 7-Day Background Deposit Info & Fast Forward Panel */}
       <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
         <div className="space-y-1.5 md:max-w-2xl">
           <div className="flex flex-wrap items-center gap-2">
             <Clock className="w-4 h-4 text-capitec-orange shrink-0 animate-spin-slow" />
-            <h4 className="font-bold text-slate-800 text-sm font-display">Automated 7-Day Interest Deposit Engine</h4>
+            <h4 className="font-bold text-slate-800 text-sm font-display">Automated 7-Day Live Interest Reinvestment Engine</h4>
             <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2.5 py-0.5 rounded-full font-semibold">
               Background Active
             </span>
           </div>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Your savings pockets accrue interest in real time. Even when the application is closed or running in the background, the elapsed real time is recorded. Every <strong>7 days</strong>, your accrued interest is automatically paid out into your Main Transactional Account and printed on your bank statement.
+            Your savings pockets accrue interest in real time. Even when the application is closed or running in the background, the elapsed real time is recorded. Every <strong>7 days</strong>, your accrued live interest is automatically configured and reinvested directly into your Wealth Portfolio.
           </p>
         </div>
         
@@ -322,7 +363,7 @@ export default function SavingsTab({
             className="flex items-center justify-center space-x-2 bg-capitec-orange hover:bg-capitec-orange-light text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer group active:scale-95"
           >
             <Clock className="w-3.5 h-3.5 transition group-hover:rotate-180" />
-            <span>Simulate 7-Day Passage & Payout</span>
+            <span>Simulate 7-Day Passage &amp; Invest</span>
           </button>
         </div>
       </div>
@@ -539,7 +580,7 @@ export default function SavingsTab({
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <Coins className="w-5 h-5 text-amber-500" />
-                <h4 className="font-bold text-slate-800 text-sm">Capitec Live-Save™ Automated Round-Up</h4>
+                <h4 className="font-bold text-slate-800 text-sm">WealthIQ Live-Save™ Automated Round-Up</h4>
               </div>
               <span className="text-[9px] uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full">
                 Simulated Feature
@@ -547,7 +588,7 @@ export default function SavingsTab({
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed">
-              Whenever you make a virtual card purchase or transactional payment, the Capitec secure banking core will automatically round up your spent amount to your selected multiple. The difference is transferred silently into your savings.
+              Whenever you make a virtual card purchase or transactional payment, the WealthIQ secure banking core will automatically round up your spent amount to your selected multiple. The difference is transferred silently into your savings.
             </p>
 
             {/* Simulation breakdown list of past transactions rounded */}
@@ -671,7 +712,7 @@ export default function SavingsTab({
                   />
                 </div>
                 <span className="text-[9px] text-slate-400 block italic leading-tight">
-                  💡 Note: Real security protocol requires face capture verification for all savings transfers of R2,000 or more!
+                  Note: Real security protocol requires step-up face capture verification for all transfers exceeding R5,000!
                 </span>
               </div>
 
@@ -694,7 +735,7 @@ export default function SavingsTab({
               <ScanFace className="w-5 h-5 text-capitec-blue shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold text-slate-800 block mb-0.5">SABRIC Remote Token Protection</span>
-                <span className="leading-relaxed">To safeguard against social engineering and unauthorized cash outflows, instant pocket redemptions are monitored. Transfers exceeding the R2,000 threshold will request immediate face matching.</span>
+                <span className="leading-relaxed">To safeguard against social engineering and unauthorized cash outflows, instant pocket redemptions are monitored. Transfers exceeding the R5,000 threshold will request immediate face matching.</span>
               </div>
             </div>
           </div>

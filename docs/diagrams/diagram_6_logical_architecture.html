@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart TD
+    subgraph Presentation_Layer [Presentation Layer - Browser Runtime]
+        Vite[Vite Dev/Build Server]
+        ReactApp[React 18 Single Page Application]
+        Tailwind[Tailwind CSS Component Engine]
+        Lucide[Lucide React Banking Icons]
+        ChartJS[Chart.js 4.4 Canvas Visualizer]
+    end
+
+    subgraph Application_Layer [Application Gateway Layer - Node.js Runtime]
+        Express[Express 4.19 HTTP Web Server]
+        AuthRouter[Auth & Lockout Router]
+        LedgerRouter[Ledger & Aggregation Router]
+        CardsRouter[Virtual Cards & Limits Router]
+        SavingsRouter[Savings Pockets Router]
+        SecOpsRouter[SecOps Administration Router]
+        TokenMiddleware[JWT & Step-Up Security Middleware]
+    end
+
+    subgraph CV_Inference_Layer [Biometric Inference Layer - Python Runtime]
+        FlaskMicro[Python 3.12 Flask Microservice]
+        OpenCV[OpenCV 4.9 Image Processing]
+        DlibEngine[Dlib / MediaPipe 68 Landmark Regressor]
+        EARComputer[Eye Aspect Ratio Liveness Math Module]
+        FaceNet[128D Deep Metric Embedding Model]
+    end
+
+    subgraph Data_Persistence_Layer [Persistence & Communication Layer]
+        UserDB[(users_database.json - Encrypted Credentials)]
+        AuditDB[(tblBiometricAuthLog - SecOps Audit Logs)]
+        SMTPRelay[Nodemailer Secure Port 465 SSL Relay]
+    end
+
+    subgraph External_Cloud_Layer [External Cloud AI Services]
+        Gemini[Google Gemini 1.5 / 2.0 Generative API]
+    end
+
+    Presentation_Layer -->|RESTful JSON & Base64 Video Frames| Application_Layer
+    Application_Layer -->|Localhost HTTP Frame Payload :5001| CV_Inference_Layer
+    Application_Layer -->|Transactional Read / Write| Data_Persistence_Layer
+    Application_Layer -->|Encrypted Outbound Email Tokens| SMTPRelay
+    Application_Layer -->|Grounded Cash-Flow Prompts| External_Cloud_Layer
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

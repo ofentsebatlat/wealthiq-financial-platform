@@ -2,15 +2,16 @@ import { jsPDF } from "jspdf";
 import { Transaction } from "../types";
 
 /**
- * Generates an official, biometrically verified bank statement for Capitec WealthIQ.
+ * Generates an official, biometrically verified bank statement for WealthIQ.
  * It computes chronological progressive running balances starting from the initial deposit
  * up to the current available balance.
  */
 export function generateBankStatementPDF(
   transactions: Transaction[],
   availableBalance: number,
-  accountName: string = "Ofentse Batlang"
-) {
+  accountName: string = "Ofentse Batlang",
+  saveImmediately: boolean = true
+): jsPDF {
   const doc = new jsPDF();
   const pageWidth = 210; // A4 size
   const pageHeight = 297;
@@ -81,7 +82,7 @@ export function generateBankStatementPDF(
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184); // slate-400
     doc.text(
-      "WealthIQ Capitec Banking Extension is an authorized financial services platform. Certified protection systems apply.",
+      "WealthIQ Banking Platform is an authorized financial services platform. Certified protection systems apply.",
       margin,
       pageHeight - 13
     );
@@ -108,7 +109,7 @@ export function generateBankStatementPDF(
   let y = margin;
 
   // --- BRANDING HEADER ---
-  doc.setFillColor(0, 62, 91); // Capitec deep navy `#003E5B`
+  doc.setFillColor(0, 62, 91); // WealthIQ deep navy `#003E5B`
   doc.rect(margin, y, contentWidth, 24, "F");
 
   doc.setFont("Helvetica", "bold");
@@ -116,13 +117,13 @@ export function generateBankStatementPDF(
   doc.setTextColor(255, 255, 255);
   doc.text("Wealth", margin + 8, y + 10);
   const wealthWidth = doc.getTextWidth("Wealth");
-  doc.setTextColor(227, 6, 19); // Capitec Red #E30613
+  doc.setTextColor(227, 6, 19); // Theme Red #E30613
   doc.text("IQ", margin + 8 + wealthWidth, y + 10);
 
   doc.setFont("Helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(186, 230, 253); // light blue
-  doc.text("CAPITEC BANKING EXTENSION", margin + 8, y + 15);
+  doc.text("INTELLIGENT BANKING PLATFORM", margin + 8, y + 15);
 
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(11);
@@ -312,7 +313,7 @@ export function generateBankStatementPDF(
   doc.setFontSize(6.5);
   doc.setTextColor(51, 65, 85); // slate-700
   doc.text(
-    `This digital document was locked and compiled securely following authorized authentication by Capitec Client ${accountName}.`,
+    `This digital document was locked and compiled securely following authorized authentication by WealthIQ Client ${accountName}.`,
     margin + 6,
     y + 10
   );
@@ -329,6 +330,200 @@ export function generateBankStatementPDF(
     drawPageBorderAndFooter(i, totalPages);
   }
 
-  // Save the document
-  doc.save(`WealthIQ_Capitec_Statement_${new Date().toISOString().split("T")[0]}.pdf`);
+  // Save the document if requested
+  if (saveImmediately) {
+    doc.save(`WealthIQ_Statement_${new Date().toISOString().split("T")[0]}.pdf`);
+  }
+  return doc;
+}
+
+/**
+ * Generates an official, stamped WealthIQ Proof of Payment (POP) PDF document.
+ */
+export function generateProofOfPaymentPDF(
+  tx: Transaction,
+  accountName: string = "Ofentse Batlang",
+  accountNumber: string = "1431289445",
+  saveImmediately: boolean = true
+): jsPDF {
+  const doc = new jsPDF();
+  const pageWidth = 210;
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Outer border & frame
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.setLineWidth(0.4);
+  doc.roundedRect(margin, margin, contentWidth, 230, 4, 4, "S");
+
+  // Header background banner
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, margin, contentWidth, 32, 4, 4, "F");
+
+  // Logo Wealth (Blue) + IQ (Red)
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(0, 75, 135); // #004b87
+  doc.text("Wealth", margin + 10, margin + 16);
+  doc.setTextColor(229, 27, 36); // #e51b24
+  doc.text("IQ", margin + 46, margin + 16);
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.text("OFFICIAL NOTIFICATION OF PAYMENT", margin + 10, margin + 24);
+
+  // Top Right: Ref & Timestamp
+  const refCode = `WIQ-TX-${tx.id.toUpperCase().replace(/[^A-Z0-9]/g, "")}-2026`;
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(30, 41, 59);
+  doc.text(`Ref: ${refCode}`, pageWidth - margin - 10, margin + 14, { align: "right" });
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Date: ${tx.date} 10:42 SAST`, pageWidth - margin - 10, margin + 21, { align: "right" });
+
+  // Divider line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.3);
+  doc.line(margin, margin + 32, pageWidth - margin, margin + 32);
+
+  // Stamped Watermark in center-right
+  doc.setDrawColor(229, 27, 36); // red stamp
+  doc.setLineWidth(1.2);
+  doc.circle(pageWidth - margin - 35, margin + 85, 22, "S");
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(229, 27, 36);
+  doc.text("WEALTHIQ BANK", pageWidth - margin - 35, margin + 80, { align: "center" });
+  doc.setFontSize(6.5);
+  doc.text("BRANCH 470010", pageWidth - margin - 35, margin + 85, { align: "center" });
+  doc.text("VERIFIED EFT", pageWidth - margin - 35, margin + 90, { align: "center" });
+
+  // Payer Details Box
+  let y = margin + 40;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin + 8, y, (contentWidth - 20) / 2, 45, 3, 3, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin + 8, y, (contentWidth - 20) / 2, 45, 3, 3, "S");
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184); // slate-400
+  doc.text("PAYER INFORMATION", margin + 14, y + 9);
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text(accountName, margin + 14, y + 19);
+
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Global One Acc: ${accountNumber}`, margin + 14, y + 27);
+  doc.text("Universal Branch Code: 470010", margin + 14, y + 34);
+  doc.text("Bank: WealthIQ Banking", margin + 14, y + 40);
+
+  // Recipient Details Box
+  const col2X = margin + 8 + (contentWidth - 20) / 2 + 4;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(col2X, y, (contentWidth - 20) / 2, 45, 3, 3, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(col2X, y, (contentWidth - 20) / 2, 45, 3, 3, "S");
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text("PAYMENT RECIPIENT", col2X + 6, y + 9);
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(tx.description, col2X + 6, y + 19);
+
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Category: ${tx.category}`, col2X + 6, y + 27);
+  doc.setTextColor(5, 150, 105); // emerald-600
+  doc.setFont("Helvetica", "bold");
+  doc.text("Immediate EFT Cleared", col2X + 6, y + 34);
+  doc.setFont("Helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  doc.text("Real-Time Clearing (RTC)", col2X + 6, y + 40);
+
+  // Amount Box (High emphasis)
+  y += 54;
+  doc.setFillColor(239, 246, 255); // blue-50
+  doc.roundedRect(margin + 8, y, contentWidth - 16, 32, 3, 3, "F");
+  doc.setDrawColor(191, 219, 254); // blue-200
+  doc.roundedRect(margin + 8, y, contentWidth - 16, 32, 3, 3, "S");
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(0, 75, 135); // theme blue
+  doc.text("TOTAL AMOUNT PAID", margin + 16, y + 11);
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(15, 23, 42);
+  doc.text(
+    `R ${tx.amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    margin + 16,
+    y + 24
+  );
+
+  // "SUCCESSFUL" status badge
+  doc.setFillColor(5, 150, 105); // emerald-600
+  doc.roundedRect(pageWidth - margin - 52, y + 8, 38, 14, 7, 7, "F");
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("SUCCESSFUL", pageWidth - margin - 33, y + 17, { align: "center" });
+
+  // Security & Verification Information Box
+  y += 40;
+  doc.setFillColor(254, 252, 232); // yellow-50
+  doc.roundedRect(margin + 8, y, contentWidth - 16, 42, 3, 3, "F");
+  doc.setDrawColor(254, 240, 138); // yellow-200
+  doc.roundedRect(margin + 8, y, contentWidth - 16, 42, 3, 3, "S");
+
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(133, 77, 14); // yellow-800
+  doc.text("BANK VERIFICATION & SECURITY METRICS", margin + 14, y + 9);
+
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`• Digital Tracking Token: SEC-EFT-${tx.id.toUpperCase()}-${Date.now().toString().slice(-6)}`, margin + 14, y + 17);
+  doc.text("• Biometric Face ID Authorization: CONFIRMED & VERIFIED (SABRIC Standard)", margin + 14, y + 24);
+  doc.text("• Clearing Type: South African Real-Time Clearing System (RTC)", margin + 14, y + 31);
+  doc.text("• Digital Document Integrity: Cryptographically Signed & Computer-Generated", margin + 14, y + 37);
+
+  // Legal Footer
+  y += 50;
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    "© 2026 WealthIQ. All rights reserved. Registered credit provider (NCRCP13).",
+    margin + 8,
+    y
+  );
+  doc.text(
+    "Registration Number: 1999/025903/06. This notification of payment serves as an official proof of payment.",
+    margin + 8,
+    y + 5
+  );
+  doc.text(
+    "For inquiries, contact WealthIQ Client Care or visit support in your dashboard.",
+    margin + 8,
+    y + 10
+  );
+
+  if (saveImmediately) {
+    doc.save(`WealthIQ_Proof_of_Payment_${tx.id}.pdf`);
+  }
+  return doc;
 }

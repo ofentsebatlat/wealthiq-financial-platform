@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+classDiagram
+    class User {
+        +int userId
+        +string studentAccountNumber
+        +string firstName
+        +string surname
+        +string email
+        +string remotePinHash
+        +byte[] faceBiometricTemplate
+        +DateTime dateRegistered
+        +bool isLocked
+        +DateTime lockedUntil
+        +int failedPinAttempts
+        +validatePin(string pin) bool
+        +incrementFailedAttempts() int
+        +resetFailedAttempts() void
+        +lockAccount(int minutes) void
+    }
+
+    class Account {
+        +int accountId
+        +int userId
+        +decimal availableBalance
+        +decimal monthlyIncome
+        +decimal monthlyExpenses
+        +decimal savingsRatePercentage
+        +calculateAvailableBalance(List~Transaction~ txs, List~SavingsPocket~ pks) decimal
+        +calculateMonthlyMetrics(List~Transaction~ txs) void
+    }
+
+    class Transaction {
+        +int transactionId
+        +int accountId
+        +DateTime transactionDate
+        +string description
+        +string category
+        +string transactionType
+        +decimal amount
+        +categorizeMerchant(string merchant) string
+    }
+
+    class VirtualCard {
+        +int cardId
+        +int accountId
+        +string cardType
+        +string cardNumberEncrypted
+        +string cvvEncrypted
+        +string expiryDate
+        +decimal dailyLimit
+        +decimal monthlyLimit
+        +string cardStatus
+        +maskPan() string
+        +unmaskPan(string stepUpToken) string
+        +toggleFreeze() void
+        +verifySpendingLimit(decimal amount) bool
+    }
+
+    class SavingsPocket {
+        +int pocketId
+        +int accountId
+        +string pocketName
+        +string pocketCategory
+        +decimal interestRate
+        +decimal pocketBalance
+        +decimal goalAmount
+        +bool roundUpEnabled
+        +calculateAccruedInterest(int elapsedDays) decimal
+        +depositFunds(decimal amount) void
+    }
+
+    class BiometricAuthLog {
+        +int authLogId
+        +int userId
+        +string authMethod
+        +DateTime attemptTimestamp
+        +decimal matchPercentage
+        +bool livenessVerified
+        +string authStatus
+        +string ipAddress
+    }
+
+    class AIInsightLog {
+        +int insightId
+        +int accountId
+        +string sender
+        +string messageText
+        +DateTime messageTimestamp
+    }
+
+    User "1" --> "1" Account : owns
+    User "1" --> "*" BiometricAuthLog : generates
+    Account "1" --> "*" Transaction : contains
+    Account "1" --> "*" VirtualCard : issues
+    Account "1" --> "*" SavingsPocket : holds
+    Account "1" --> "*" AIInsightLog : records
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

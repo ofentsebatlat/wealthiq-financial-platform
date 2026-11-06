@@ -274,7 +274,7 @@ export default function SimulationsTab({
                   {/* Actionable simulated tips */}
                   {percentage < 100 && goal.monthlyContribution > 0 && (
                     <div className="text-[11px] text-capitec-blue font-semibold bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 mt-1 sm:mt-0">
-                      💡 Bump monthly by <strong className="font-mono">R500</strong> to reach <strong className="font-mono">{Math.max(1, Math.ceil(remainingCost / (goal.monthlyContribution + 500)))}</strong> months sooner!
+                      Bump monthly by <strong className="font-mono">R500</strong> to reach <strong className="font-mono">{Math.max(1, Math.ceil(remainingCost / (goal.monthlyContribution + 500)))}</strong> months sooner!
                     </div>
                   )}
                 </div>

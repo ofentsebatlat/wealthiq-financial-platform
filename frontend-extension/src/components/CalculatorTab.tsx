@@ -86,7 +86,7 @@ export default function CalculatorTab() {
           Compound Growth Calculator
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Explore the compounding effect. Drag the sliders to visualize your future Capitec wealth curves.
+          Explore the compounding effect. Drag the sliders to visualize your future WealthIQ wealth curves.
         </p>
       </div>
 
@@ -357,7 +357,7 @@ export default function CalculatorTab() {
 
           {/* Compound Interest fun fact card */}
           <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl text-xs text-slate-600 leading-relaxed">
-            <span className="font-bold text-slate-800 text-sm block mb-1">💡 The Compounding Secret</span>
+            <span className="font-bold text-slate-800 text-sm block mb-1">The Compounding Secret</span>
             At the end of {years} years, <strong className="text-emerald-600">R{(finalInterest / finalTotal * 100).toFixed(0)}%</strong> of your entire simulated wealth consists of interest generated from itself! That is the power of compounding—money breeding money. Moving transactional cash to savings pockets early is critical.
           </div>
 

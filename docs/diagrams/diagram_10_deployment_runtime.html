@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart TD
+    subgraph Host_Environment [Operating System Host - Local / Containerized]
+        subgraph Frontend_Process [Node Process: Vite Server]
+            ViteHost[HTTP Port 3000 / 5173]
+            ReactBundle[SPA Static Assets & Bundle]
+        end
+
+        subgraph Backend_Process [Node.js Express API Server]
+            NodeHost[HTTP Port 3000]
+            APIEngine[Express Router & Middleware]
+            JSONLedger[(Local File System: users_database.json)]
+        end
+
+        subgraph CV_Microservice [Python 3.12 Flask Microservice]
+            PyHost[HTTP Port 5001]
+            CVInference[OpenCV & Dlib Landmark Processor]
+        end
+    end
+
+    subgraph External_Network [External Cloud Services]
+        GoogleGemini[Google Gemini API: HTTPS / TLS 1.3]
+        GmailSMTP[Gmail SMTP Relay: Port 465 SSL]
+    end
+
+    ClientDevice[Client Web Browser - Desktop / Mobile] -->|HTTP / WebSocket| ViteHost
+    ViteHost -->|Proxies /api/*| NodeHost
+    NodeHost -->|Frame Payloads HTTP POST| PyHost
+    NodeHost -->|Read / Write Atomic Streams| JSONLedger
+    NodeHost -->|HTTPS REST| GoogleGemini
+    NodeHost -->|Encrypted TLS Stream| GmailSMTP
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

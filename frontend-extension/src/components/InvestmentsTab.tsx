@@ -54,8 +54,8 @@ export default function InvestmentsTab({
 
   // South African Standard Rates table for comparing
   const standardRates = [
-    { name: "Capitec Active Savings Pocket", rate: "up to 5.25%", desc: "No notice required. Interest earned on daily balance." },
-    { name: "Capitec 12-Month Fixed Deposit", rate: "8.15% - 8.25%", desc: "SARS tax-free account option available. Max profit." },
+    { name: "WealthIQ Active Savings Pocket", rate: "up to 5.25%", desc: "No notice required. Interest earned on daily balance." },
+    { name: "WealthIQ 12-Month Fixed Deposit", rate: "8.15% - 8.25%", desc: "SARS tax-free account option available. Max profit." },
     { name: "SATRIX 40 ETF (South African Equities)", rate: "11.20% (Avg)", desc: "Tracks JSE Top 40 shares. Higher volatility, long term." },
     { name: "Standard Retail Savings Bonds", rate: "7.75% - 8.50%", desc: "Backed by National Treasury. Zero capital risk." }
   ];
@@ -104,7 +104,7 @@ export default function InvestmentsTab({
             <input
               id="investment-name"
               type="text"
-              placeholder="e.g. Satrix JSE ETF, Capitec Pocket"
+              placeholder="e.g. Satrix JSE ETF, WealthIQ Pocket"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="p-2.5 border border-slate-200 bg-slate-50 rounded-lg outline-none text-slate-700 focus:bg-white focus:border-capitec-blue text-sm transition"

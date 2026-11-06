@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+erDiagram
+    tblUser ||--o{ tblAccount : owns
+    tblUser ||--o{ tblBiometricAuthLog : generates
+    tblAccount ||--o{ tblTransaction : contains
+    tblAccount ||--o{ tblVirtualCard : issues
+    tblAccount ||--o{ tblSavingsPocket : holds
+    tblAccount ||--o{ tblInvestmentAsset : models
+    tblAccount ||--o{ tblFinancialGoal : simulates
+    tblAccount ||--o{ tblAIInsightLog : records
+
+    tblUser {
+        int UserID PK
+        varchar StudentAccountNumber
+        varchar FirstName
+        varchar Surname
+        varchar Email
+        varchar RemotePINHash
+        blob FaceBiometricTemplate
+        datetime DateRegistered
+        boolean IsLocked
+        datetime LockedUntil
+        int FailedPinAttempts
+    }
+
+    tblAccount {
+        int AccountID PK
+        int UserID FK
+        decimal AvailableBalance
+        decimal MonthlyIncome
+        decimal MonthlyExpenses
+        decimal SavingsRatePercentage
+    }
+
+    tblTransaction {
+        int TransactionID PK
+        int AccountID FK
+        date TransactionDate
+        varchar Description
+        varchar Category
+        varchar TransactionType
+        decimal Amount
+    }
+
+    tblVirtualCard {
+        int CardID PK
+        int AccountID FK
+        varchar CardType
+        varchar CardNumberEncrypted
+        varchar CVVEncrypted
+        varchar ExpiryDate
+        decimal DailyLimit
+        decimal MonthlyLimit
+        varchar CardStatus
+    }
+
+    tblSavingsPocket {
+        int PocketID PK
+        int AccountID FK
+        varchar PocketName
+        varchar PocketCategory
+        decimal InterestRate
+        decimal PocketBalance
+        decimal GoalAmount
+        boolean RoundUpEnabled
+        date DateCreated
+    }
+
+    tblInvestmentAsset {
+        int AssetID PK
+        int AccountID FK
+        varchar AssetName
+        varchar AssetClass
+        decimal Balance
+        decimal MonthlyContribution
+        decimal ExpectedReturnRate
+    }
+
+    tblFinancialGoal {
+        int GoalID PK
+        int AccountID FK
+        varchar GoalName
+        varchar GoalCategory
+        decimal GoalSize
+        decimal AccumulatedAmount
+        decimal MonthlyPayment
+        decimal CompletionPercentage
+    }
+
+    tblBiometricAuthLog {
+        int AuthLogID PK
+        int UserID FK
+        varchar AuthMethod
+        datetime AttemptTimestamp
+        decimal MatchPercentage
+        boolean LivenessVerified
+        varchar AuthStatus
+        varchar IPAddress
+    }
+
+    tblAIInsightLog {
+        int InsightID PK
+        int AccountID FK
+        varchar Sender
+        text MessageText
+        datetime MessageTimestamp
+    }
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

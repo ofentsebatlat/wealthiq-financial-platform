@@ -335,7 +335,7 @@ export default function ModelsTab({ currentUserName }: ModelsTabProps) {
             </div>
             <div className="flex justify-between text-slate-500">
               <span>Context Awareness:</span>
-              <span className="font-semibold text-slate-700">SARS TFSA, Capitec Rules</span>
+              <span className="font-semibold text-slate-700">SARS TFSA, WealthIQ Rules</span>
             </div>
             <div className="flex justify-between text-slate-500">
               <span>Latency:</span>

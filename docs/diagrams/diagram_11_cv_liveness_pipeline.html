@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart TD
+    FrameIn[Client Webcam: Base64 JPEG Frame] --> Decode[OpenCV cv2.imdecode: Grayscale Conversion]
+    Decode --> FaceDet[Face Detection: HOG + Linear SVM Frontal Detector]
+    FaceDet --> FaceBox{Face Detected?}
+    FaceBox -- No --> ReturnNoFace[Return 400: No Face Found]
+    FaceBox -- Yes --> Landmarks[Dlib 68-Point Facial Landmark Regressor]
+    
+    Landmarks --> EARCalc[Compute Eye Aspect Ratio: Left & Right Eye]
+    EARCalc --> LivenessCheck{EAR < 0.22 Detected?}
+    LivenessCheck -- No (Static Photo) --> RejectSpoof[Return 403: Liveness Check Failed - Presentation Spoof]
+    LivenessCheck -- Yes (Blink Verified) --> EmbedExtract[Deep Metric Network: 128D Embedding Vector]
+    
+    EmbedExtract --> FetchTemplate[Retrieve Stored Biometric Template from Database]
+    FetchTemplate --> DistCalc[Compute Euclidean Distance d between Live Vector and Template]
+    DistCalc --> ThresholdCheck{d <= 0.60?}
+    ThresholdCheck -- Yes --> AuthSuccess[Return 200: Match Confirmed, Similarity >= 85%]
+    ThresholdCheck -- No --> AuthFail[Return 401: Biometric Mismatch]
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

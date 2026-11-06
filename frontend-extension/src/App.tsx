@@ -1,8 +1,17 @@
 import { useState, FormEvent, useEffect } from "react";
-import { X, HelpCircle, AlertCircle, Info } from "lucide-react";
+import { X, HelpCircle, AlertCircle, Info, Bell, Headphones, CheckCircle2, ShieldCheck } from "lucide-react";
 
 // Types
-import { Transaction, InvestmentItem, SimulationGoal, ChatMessage, VirtualCard, SavingsPocket } from "./types";
+import {
+  Transaction,
+  InvestmentItem,
+  SimulationGoal,
+  ChatMessage,
+  VirtualCard,
+  SavingsPocket,
+  BankNotification,
+  SupportTicket
+} from "./types";
 
 // Components
 import Sidebar from "./components/Sidebar";
@@ -14,11 +23,16 @@ import SimulationsTab from "./components/SimulationsTab";
 import GuidanceTab from "./components/GuidanceTab";
 import VirtualCardsTab from "./components/VirtualCardsTab";
 import SavingsTab from "./components/SavingsTab";
-import SecurityEnrollment from "./components/SecurityEnrollment";
+import SecurityEnrollment, { BankOnboardingDetails } from "./components/SecurityEnrollment";
 import BiometricVerifyModal from "./components/BiometricVerifyModal";
 import LoginPage from "./components/LoginPage";
 import ProfileTab from "./components/ProfileTab";
-import ModelsTab from "./components/ModelsTab";
+import AdminPortal from "./components/AdminPortal";
+import NotificationDrawer from "./components/NotificationDrawer";
+import BankSupportModal from "./components/BankSupportModal";
+import LoadingPage from "./components/LoadingPage";
+import SessionLockModal from "./components/SessionLockModal";
+import { SIMULATED_TRANSACTIONS, BOKANG_SIMULATED_TRANSACTIONS } from "./data/simulatedTransactions";
 
 // Firebase Sync Utilities
 import {
@@ -41,25 +55,14 @@ import {
   deleteSavingsPocket
 } from "./utils/firebaseSync";
 
-// Initial mock transactions (South African / Capitec profile)
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: "tx-1", date: "2026-07-01", description: "Capitec Salary Credit", category: "Income", type: "income", amount: 26500 },
-  { id: "tx-2", date: "2026-07-02", description: "Rent: City Property", category: "Utilities", type: "expense", amount: 6500 },
-  { id: "tx-3", date: "2026-07-03", description: "Woolworths Food Store", category: "Food", type: "expense", amount: 1240 },
-  { id: "tx-4", date: "2026-07-05", description: "Shell Fuel Petrol", category: "Transport", type: "expense", amount: 850 },
-  { id: "tx-5", date: "2026-07-08", description: "Netflix South Africa", category: "Entertainment", type: "expense", amount: 199 },
-  { id: "tx-6", date: "2026-07-10", description: "Eskom Prepaid Power", category: "Utilities", type: "expense", amount: 900 },
-  { id: "tx-7", date: "2026-07-11", description: "Dis-Chem Pharmacy Mall", category: "Health", type: "expense", amount: 420 },
-  { id: "tx-8", date: "2026-07-12", description: "Checkers Hyper Spar", category: "Food", type: "expense", amount: 680 },
-  { id: "tx-9", date: "2026-07-13", description: "ATM Cash Withdrawal", category: "Other", type: "expense", amount: 500 },
-  { id: "tx-10", date: "2026-07-14", description: "JSE Satrix JSE ETF", category: "Investment", type: "expense", amount: 1500 }
-];
+// Initial transactions: Full May–Nov 2026 comprehensive simulated ledger (121 records)
+const INITIAL_TRANSACTIONS: Transaction[] = SIMULATED_TRANSACTIONS;
 
 // Initial investments
 const INITIAL_INVESTMENTS: InvestmentItem[] = [
-  { id: "inv-1", name: "Capitec Tax-Free Savings", type: "Fixed Deposit", currentValue: 25000, monthlyContribution: 2500, expectedAnnualReturn: 8.2, dateOpened: "2025-01-10" },
+  { id: "inv-1", name: "WealthIQ Tax-Free Savings", type: "Fixed Deposit", currentValue: 25000, monthlyContribution: 2500, expectedAnnualReturn: 8.2, dateOpened: "2025-01-10" },
   { id: "inv-2", name: "Satrix Top 40 ETF", type: "Share", currentValue: 18000, monthlyContribution: 1500, expectedAnnualReturn: 11.5, dateOpened: "2025-06-15" },
-  { id: "inv-3", name: "Capitec Active pocket", type: "Savings pocket", currentValue: 12500, monthlyContribution: 500, expectedAnnualReturn: 5.25, dateOpened: "2026-02-01" }
+  { id: "inv-3", name: "WealthIQ Active pocket", type: "Savings pocket", currentValue: 12500, monthlyContribution: 500, expectedAnnualReturn: 5.25, dateOpened: "2026-02-01" }
 ];
 
 // Initial simulation goals
@@ -126,6 +129,84 @@ const INITIAL_SAVINGS_POCKETS: SavingsPocket[] = [
   }
 ];
 
+const INITIAL_NOTIFICATIONS: BankNotification[] = [
+  {
+    id: "notif-1",
+    title: "Salary Payment Credited",
+    message: "WealthIQ Salary Credit of R45,000.00 has been credited to your Global One account.",
+    date: "July 1, 10:15 AM",
+    timestamp: Date.now() - 3600000 * 24 * 3,
+    category: "transaction",
+    read: false,
+    amount: 26500,
+    type: "income",
+    actionTab: "transactions"
+  },
+  {
+    id: "notif-2",
+    title: "Biometric Face ID Verified",
+    message: "128-dimensional facial biometrics verified on Windows using strict Euclidean distance (0.45).",
+    date: "Today, 10:48 AM",
+    timestamp: Date.now() - 600000,
+    category: "security",
+    read: false,
+    actionTab: "profile"
+  },
+  {
+    id: "notif-3",
+    title: "FICA & HANIS Compliance Active",
+    message: "Your South African ID has been verified with Home Affairs. FICA status active until Oct 2027.",
+    date: "July 1, 09:00 AM",
+    timestamp: Date.now() - 3600000 * 24 * 3,
+    category: "compliance",
+    read: true,
+    actionTab: "profile"
+  },
+  {
+    id: "notif-4",
+    title: "SARS Tax-Free Allowance Notice",
+    message: "You have R11,000 remaining on your R36,000 annual SARS tax-free investment allowance.",
+    date: "Yesterday, 14:20 PM",
+    timestamp: Date.now() - 3600000 * 20,
+    category: "advisor",
+    read: false,
+    actionTab: "investments"
+  },
+  {
+    id: "notif-5",
+    title: "Virtual Shopping Card Ready",
+    message: "Virtual Debit Card 4431...1944 active with dynamic daily limits and public shield.",
+    date: "July 1, 11:30 AM",
+    timestamp: Date.now() - 3600000 * 24 * 2,
+    category: "security",
+    read: true,
+    actionTab: "cards"
+  }
+];
+
+const INITIAL_TICKETS: SupportTicket[] = [
+  {
+    id: "ticket-1",
+    bankReference: "CAS-38291-KYC",
+    subject: "FICA Biometric HANIS Onboarding",
+    category: "FICA & KYC",
+    status: "Resolved",
+    date: "1 Jul 2026",
+    description: "Automated electronic identity verification with Home Affairs database completed.",
+    preferredContact: "Secure In-App Message"
+  },
+  {
+    id: "ticket-2",
+    bankReference: "CAS-41029-CRD",
+    subject: "Virtual Shopping Card Activation",
+    category: "Card Security",
+    status: "Resolved",
+    date: "2 Jul 2026",
+    description: "Issued virtual card for online shopping with tokenized CVV and customizable limits.",
+    preferredContact: "SMS"
+  }
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -136,110 +217,248 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loadingMessage, setLoadingMessage] = useState(false);
 
-  // Authentication & Session state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Bank Communications & Support State
+  const [notifications, setNotifications] = useState<BankNotification[]>(INITIAL_NOTIFICATIONS);
+  const [tickets, setTickets] = useState<SupportTicket[]>(INITIAL_TICKETS);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+
+  // Authentication & Session state: Restores active authenticated session from sessionStorage if present
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    try {
+      const sess = sessionStorage.getItem("wealthiq_session");
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        return Boolean(parsed.isLoggedIn);
+      }
+    } catch {}
+    return false;
+  });
+  const [userRole, setUserRole] = useState<"user" | "admin">(() => {
+    try {
+      const sess = sessionStorage.getItem("wealthiq_session");
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (parsed.role === "admin" || parsed.role === "user") return parsed.role;
+      }
+    } catch {}
+    return "user";
+  });
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
 
   // Security Profile states (Mandatory onboarding enrollment)
   const [isSecurityRegistered, setIsSecurityRegistered] = useState(false);
   const [userPin, setUserPin] = useState("");
   const [userFacePhoto, setUserFacePhoto] = useState("");
-  const [userName, setUserName] = useState("Ofentse Batlang");
-  const [startingBalance, setStartingBalance] = useState(36546.55);
-  const [userEmail, setUserEmail] = useState("ofentsebatlang@gmail.com");
-  const [userPhone, setUserPhone] = useState("+27 82 456 7890");
+  const [userName, setUserName] = useState(() => {
+    try {
+      const sess = sessionStorage.getItem("wealthiq_session") || localStorage.getItem("wealthiq_session");
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (parsed.userName) return parsed.userName;
+      }
+    } catch {}
+    return "";
+  });
+  const [startingBalance, setStartingBalance] = useState(0);
+  const [userEmail, setUserEmail] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [userIdNumber, setUserIdNumber] = useState("");
+  const [userDob, setUserDob] = useState("");
+  const [userAccountNumber, setUserAccountNumber] = useState("");
+  const [userAccountType, setUserAccountType] = useState("Global One Account");
+  const [userEnrollmentDate, setUserEnrollmentDate] = useState("");
+  const [userMonthlySalary, setUserMonthlySalary] = useState<number>(45000);
 
-  // Load persistent security profile and other data on application mount
+  // Session & page loading states
+  const [isSessionLoading, setIsSessionLoading] = useState<boolean>(() => {
+    try {
+      const sess = sessionStorage.getItem("wealthiq_session") || localStorage.getItem("wealthiq_session");
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        return Boolean(parsed.isLoggedIn && parsed.userName);
+      }
+    } catch {}
+    return false;
+  });
+  const [isSessionLocked, setIsSessionLocked] = useState<boolean>(false);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
+  const [loadingPageTitle, setLoadingPageTitle] = useState<string>("Loading WealthIQ");
+  const [loadingPageSubtitle, setLoadingPageSubtitle] = useState<string>("Establishing secure connection & decrypting banking records...");
+
+  // Security Measure 1: Inactivity Auto-Lock (2-Minute Session Timeout)
   useEffect(() => {
-    const loadAllFirebaseData = async () => {
-      try {
-        // 1. Fetch Security Profile from Cloud
-        const cloudProfile = await fetchSecurityProfile();
-        if (cloudProfile && cloudProfile.isSecurityRegistered) {
-          setIsSecurityRegistered(true);
-          setUserPin(cloudProfile.userPin);
-          setUserFacePhoto(cloudProfile.userFacePhoto);
-          setUserName(cloudProfile.userName || "Ofentse Batlang");
-          setStartingBalance(cloudProfile.startingBalance !== undefined ? cloudProfile.startingBalance : 36546.55);
-          setUserEmail(cloudProfile.userEmail || "ofentsebatlang@gmail.com");
-          setUserPhone(cloudProfile.userPhone || "+27 82 456 7890");
-          console.log("[WealthIQ] Successfully loaded security profile from Firestore database.");
-        } else {
-          // Local storage fallback
-          const localProfileStr = localStorage.getItem("capitec_security_profile");
-          if (localProfileStr) {
-            try {
-              const localProfile = JSON.parse(localProfileStr);
-              if (localProfile && localProfile.isSecurityRegistered) {
-                setIsSecurityRegistered(true);
-                setUserPin(localProfile.userPin || "");
-                setUserFacePhoto(localProfile.userFacePhoto || "");
-                setUserName(localProfile.userName || "Ofentse Batlang");
-                setStartingBalance(localProfile.startingBalance !== undefined ? localProfile.startingBalance : 36546.55);
-                setUserEmail(localProfile.userEmail || "ofentsebatlang@gmail.com");
-                setUserPhone(localProfile.userPhone || "+27 82 456 7890");
-                // Sync fallback to cloud
-                await saveSecurityProfile({
-                  userPin: localProfile.userPin || "",
-                  userFacePhoto: localProfile.userFacePhoto || "",
-                  isSecurityRegistered: true,
-                  userName: localProfile.userName || "Ofentse Batlang",
-                  startingBalance: localProfile.startingBalance !== undefined ? localProfile.startingBalance : 36546.55,
-                  userEmail: localProfile.userEmail || "ofentsebatlang@gmail.com",
-                  userPhone: localProfile.userPhone || "+27 82 456 7890"
-                });
-                console.log("[WealthIQ] Synchronized localStorage security profile to Firestore.");
-              }
-            } catch (e) {
-              console.warn("[WealthIQ] Error reading localStorage profile fallback:", e);
-            }
-          }
+    if (!isLoggedIn || isSessionLoading || isSessionLocked) return;
 
-          // 1c. Server database fallback
-          try {
-            const serverRes = await fetch("/api/security-profile");
-            if (serverRes.ok) {
-              const serverProfile = await serverRes.json();
-              if (serverProfile && serverProfile.isSecurityRegistered) {
-                setIsSecurityRegistered(true);
-                setUserPin(serverProfile.userPin || "1234");
-                setUserFacePhoto(serverProfile.userFacePhoto || "");
-                setUserName(serverProfile.userName || "Ofentse Batlang");
-                setStartingBalance(serverProfile.startingBalance !== undefined ? serverProfile.startingBalance : 36546.55);
-                setUserEmail(serverProfile.userEmail || "ofentsebatlang@gmail.com");
-                setUserPhone(serverProfile.userPhone || "+27 82 456 7890");
-                console.log("[WealthIQ] Synchronized security profile from persistent server database.");
-              }
-            }
-          } catch (e) {
-            console.warn("[WealthIQ] Error reading server profile fallback:", e);
-          }
-        }
+    const INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes (120 seconds)
+    let timeoutId: NodeJS.Timeout;
 
-        // 2. Fetch other collections from Cloud, with empty seeds to avoid demo data seeding
-        const txs = await fetchTransactions([]);
-        setTransactions(txs);
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsSessionLocked(true);
+      }, INACTIVITY_TIMEOUT_MS);
+    };
 
-        const invs = await fetchInvestments([]);
-        setInvestments(invs);
+    const activityEvents = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "click"];
+    activityEvents.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
 
-        const simGoals = await fetchSimulationGoals([]);
-        setGoals(simGoals);
+    resetTimer();
 
-        const vCards = await fetchVirtualCards([]);
-        setCards(vCards);
+    return () => {
+      clearTimeout(timeoutId);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [isLoggedIn, isSessionLoading, isSessionLocked]);
 
-        const pockets = await fetchSavingsPockets([]);
-        setSavingsPockets(pockets);
-        processInterestPayouts(pockets);
+  // Smooth page loading transition between navigation tabs
+  const handleTabChange = (newTab: string) => {
+    if (newTab === activeTab) return;
+    setIsPageLoading(true);
 
-        console.log("[WealthIQ] All database collections synchronized with Cloud Firestore.");
-      } catch (err) {
-        console.error("[WealthIQ] Error synchronizing with Cloud Firestore:", err);
+    const tabMeta: Record<string, { title: string; subtitle: string }> = {
+      dashboard: {
+        title: "Loading Dashboard",
+        subtitle: "Analyzing live cashflow, account balances, and financial health score..."
+      },
+      transactions: {
+        title: "Loading Transactions",
+        subtitle: "Fetching encrypted transaction ledger, merchant details, and VAT receipts..."
+      },
+      savings: {
+        title: "Loading Savings Pockets",
+        subtitle: "Calculating interest yields, goal progress, and automatic round-ups..."
+      },
+      cards: {
+        title: "Loading Virtual Cards",
+        subtitle: "Accessing tokenized card vault, dynamic CVVs, and spending controls..."
+      },
+      investments: {
+        title: "Loading Investment Vault",
+        subtitle: "Valuing active asset positions, SARS tax-free allowance, and APY rates..."
+      },
+      calculator: {
+        title: "Loading Financial Calculator",
+        subtitle: "Preparing compound interest formulas and loan repayment simulators..."
+      },
+      simulations: {
+        title: "Loading Wealth Simulations",
+        subtitle: "Projecting retirement horizons, inflation models, and target milestones..."
+      },
+      guidance: {
+        title: "Loading AI Financial Guidance",
+        subtitle: "Synchronizing with WealthIQ Gemini AI financial advisory intelligence..."
+      },
+      profile: {
+        title: "Loading Security Profile",
+        subtitle: "Retrieving verified FICA credentials, HANIS status, and biometric locks..."
       }
     };
 
-    loadAllFirebaseData();
+    const meta = tabMeta[newTab] || {
+      title: "Loading Page",
+      subtitle: "Retrieving secure banking records..."
+    };
+
+    setLoadingPageTitle(meta.title);
+    setLoadingPageSubtitle(meta.subtitle);
+
+    setTimeout(() => {
+      setActiveTab(newTab);
+      setIsPageLoading(false);
+    }, 380);
+  };
+
+  // Reusable loader for user-isolated data (Issue 3: Every account has its own isolated data)
+  const loadUserData = async (targetName: string) => {
+    if (!targetName) return;
+    const cleanName = targetName.trim();
+    const isOfentse = cleanName.toLowerCase() === "ofentse batlang" || cleanName.toLowerCase() === "ofentse";
+    const isBokang = cleanName.toLowerCase().includes("bokang");
+
+    try {
+      // 1. Fetch user profile from persistent server API or cloud
+      const res = await fetch(`/api/security-profile?name=${encodeURIComponent(cleanName)}`);
+      let profile: any = null;
+      if (res.ok) {
+        profile = await res.json();
+      } else {
+        profile = await fetchSecurityProfile(cleanName);
+      }
+
+      const userSalary = profile?.monthlySalary || (isBokang ? 68000 : 45000);
+      setUserMonthlySalary(userSalary);
+
+      if (profile && profile.isSecurityRegistered) {
+        setIsSecurityRegistered(true);
+        setUserName(profile.userName || cleanName);
+        setUserPin(profile.userPin || "");
+        setUserFacePhoto(profile.userFacePhoto || "");
+        setStartingBalance(profile.startingBalance !== undefined ? Number(profile.startingBalance) : 0);
+        setUserEmail(profile.userEmail || "");
+        setUserPhone(profile.userPhone || "");
+        if (profile.idNumber) setUserIdNumber(profile.idNumber);
+        if (profile.dateOfBirth) setUserDob(profile.dateOfBirth);
+        if (profile.accountNumber) setUserAccountNumber(profile.accountNumber);
+        if (profile.accountType) setUserAccountType(profile.accountType);
+        if (profile.enrollmentDate) setUserEnrollmentDate(profile.enrollmentDate);
+      } else {
+        setUserName(cleanName);
+      }
+
+      // 2. Fetch user's isolated transactions
+      // Ofentse Batlang seeds with SIMULATED_TRANSACTIONS (R45,000/mo salary)
+      // Bokang Khakhau seeds with BOKANG_SIMULATED_TRANSACTIONS (R68,000/mo salary)
+      const txSeeds = isOfentse
+        ? SIMULATED_TRANSACTIONS
+        : isBokang
+          ? BOKANG_SIMULATED_TRANSACTIONS
+          : [];
+      const txs = await fetchTransactions(txSeeds, cleanName);
+      setTransactions(txs || []);
+
+      // 3. Fetch user's isolated investments, goals, cards, pockets
+      const invs = await fetchInvestments([], cleanName);
+      setInvestments(invs || []);
+
+      const simGoals = await fetchSimulationGoals([], cleanName);
+      setGoals(simGoals || []);
+
+      const vCards = await fetchVirtualCards([], cleanName);
+      setCards(vCards || []);
+
+      const pockets = await fetchSavingsPockets([], cleanName);
+      setSavingsPockets(pockets || []);
+      if (pockets && pockets.length > 0) {
+        processInterestPayouts(pockets);
+      }
+    } catch (err) {
+      console.warn("[WealthIQ] Notice loading user data:", err);
+    }
+  };
+
+  // Load active user session on app mount
+  useEffect(() => {
+    let activeName = "";
+    try {
+      const sess = sessionStorage.getItem("wealthiq_session") || localStorage.getItem("wealthiq_session");
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (parsed.userName) activeName = parsed.userName;
+      }
+    } catch {}
+
+    if (activeName) {
+      setLoadingPageTitle("Restoring Secure Session");
+      setLoadingPageSubtitle(`Loading account records and ledger for ${activeName}...`);
+      loadUserData(activeName).finally(() => {
+        setTimeout(() => {
+          setIsSessionLoading(false);
+        }, 500);
+      });
+    } else {
+      setIsSessionLoading(false);
+    }
   }, []);
 
   // Periodic interest processor background agent (evaluates active interest payout conditions)
@@ -257,22 +476,112 @@ export default function App() {
     onSuccess: () => void;
   } | null>(null);
 
+  // Dedicated complete account data wipe on logout (Issue 3)
+  const handleLogout = () => {
+    try {
+      sessionStorage.removeItem("wealthiq_session");
+      localStorage.removeItem("wealthiq_session");
+      localStorage.removeItem("wealthiq_last_email");
+      localStorage.removeItem("wealthiq_last_user");
+      localStorage.removeItem("wealthiq_security_profile");
+      localStorage.removeItem("capitec_security_profile");
+    } catch (e) {}
+
+    // Reset all user state so nothing leaks to the next session
+    setUserName("");
+    setUserEmail("");
+    setUserPhone("");
+    setUserIdNumber("");
+    setUserDob("");
+    setUserAccountNumber("");
+    setUserAccountType("Global One Account");
+    setUserEnrollmentDate("");
+    setStartingBalance(0);
+    setUserMonthlySalary(45000);
+    setIsSecurityRegistered(false);
+    setUserPin("");
+    setUserFacePhoto("");
+
+    setTransactions([]);
+    setInvestments([]);
+    setGoals([]);
+    setCards([]);
+    setSavingsPockets([]);
+
+    setUserRole("user");
+    setIsLoggedIn(false);
+    setIsSessionLoading(false);
+    setIsPageLoading(false);
+    setIsSessionLocked(false);
+  };
+
   // Security Enrollment handler
-  const handleSecurityRegister = async (name: string, pin: string, facePhoto: string, startBalance: number) => {
-    setUserName(name);
+  const handleSecurityRegister = async (
+    name: string,
+    pin: string,
+    facePhoto: string,
+    startBalance: number,
+    details?: BankOnboardingDetails
+  ) => {
+    const cleanName = name.trim();
+    const resolvedEmail = details?.email ? details.email.trim().toLowerCase() : "";
+    const resolvedPhone = details?.phone ? details.phone.trim() : "";
+    const resolvedIdNumber = details?.idNumber || "";
+    const resolvedDob = details?.dateOfBirth || "";
+    const resolvedAccNo = details?.accountNumber || `16${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const resolvedAccType = details?.accountType || "Global One Account";
+    const resolvedEnrollDate = details?.enrollmentDate || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const uniqueUserId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    setUserName(cleanName);
     setUserPin(pin);
     setUserFacePhoto(facePhoto);
     setStartingBalance(startBalance);
+    setUserEmail(resolvedEmail);
+    setUserPhone(resolvedPhone);
+    setUserIdNumber(resolvedIdNumber);
+    setUserDob(resolvedDob);
+    setUserAccountNumber(resolvedAccNo);
+    setUserAccountType(resolvedAccType);
+    setUserEnrollmentDate(resolvedEnrollDate);
     setIsSecurityRegistered(true);
     setShowEnrollmentModal(false);
+
+    // Fresh empty collections for newly registered user (no cross-account data copying)
+    setTransactions([]);
+    setInvestments([]);
+    setGoals([]);
+    setCards([]);
+    setSavingsPockets([]);
+
+    try {
+      sessionStorage.setItem("wealthiq_session", JSON.stringify({
+        isLoggedIn: true,
+        role: "user",
+        userName: cleanName
+      }));
+      localStorage.setItem("wealthiq_session", JSON.stringify({
+        isLoggedIn: true,
+        role: "user",
+        userName: cleanName
+      }));
+    } catch (e) {}
     setIsLoggedIn(true);
 
     const profile = {
+      userId: uniqueUserId,
       isSecurityRegistered: true,
       userPin: pin,
       userFacePhoto: facePhoto,
-      userName: name,
-      startingBalance: startBalance
+      userName: cleanName,
+      startingBalance: startBalance,
+      userEmail: resolvedEmail,
+      userPhone: resolvedPhone,
+      idNumber: resolvedIdNumber,
+      dateOfBirth: resolvedDob,
+      accountNumber: resolvedAccNo,
+      accountType: resolvedAccType,
+      enrollmentDate: resolvedEnrollDate
     };
 
     // 1. Persist to Firestore cloud database
@@ -285,23 +594,25 @@ export default function App() {
 
     // 2. Persist to server database (Express backup)
     try {
-      await fetch("/api/security-profile", {
+      const serverRes = await fetch("/api/security-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          userPin: pin, 
-          userFacePhoto: facePhoto,
-          userName: name,
-          startingBalance: startBalance
-        })
+        body: JSON.stringify(profile)
       });
-      console.log("[WealthIQ] Security profile saved to server database successfully.");
+      if (!serverRes.ok) {
+        const errData = await serverRes.json();
+        console.warn("[WealthIQ] Server registration notice:", errData.message);
+      } else {
+        console.log("[WealthIQ] Security profile saved to server database successfully.");
+      }
     } catch (err) {
       console.warn("[WealthIQ] Error saving security profile to server database:", err);
     }
 
-    // 3. Persist to browser local storage as backup
-    localStorage.setItem("capitec_security_profile", JSON.stringify(profile));
+    // 3. Persist to user-scoped browser local storage
+    try {
+      localStorage.setItem(`wealthiq_security_profile_${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`, JSON.stringify(profile));
+    } catch {}
   };
 
   // Handle profile updates from Profile section
@@ -327,7 +638,12 @@ export default function App() {
       userName: updated.userName,
       startingBalance: updated.startingBalance,
       userEmail: updated.userEmail,
-      userPhone: updated.userPhone
+      userPhone: updated.userPhone,
+      idNumber: userIdNumber,
+      dateOfBirth: userDob,
+      accountNumber: userAccountNumber,
+      accountType: userAccountType,
+      enrollmentDate: userEnrollmentDate
     };
 
     // 1. Sync to Cloud Firestore
@@ -351,6 +667,7 @@ export default function App() {
     }
 
     // 3. Sync to localStorage
+    localStorage.setItem("wealthiq_security_profile", JSON.stringify(profile));
     localStorage.setItem("capitec_security_profile", JSON.stringify(profile));
   };
 
@@ -379,46 +696,107 @@ export default function App() {
 
   const availableBalance = startingBalance + currentNet;
 
-  // Monthly stats calculated from active month's entries (current calendar month)
-  const todayPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+  // Monthly stats calculated from active month's entries or baseline month
+  const todayPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-11"
   const currentMonthTransactions = transactions.filter(t => t.date.startsWith(todayPrefix));
-  const monthlyIncome = currentMonthTransactions
+  const rawIncome = currentMonthTransactions
     .filter(t => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
-  const monthlyExpenses = currentMonthTransactions
+  const rawExpenses = currentMonthTransactions
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
+
+  // If in early month prior to scheduled 25th payday, show scheduled salary and representative commitments
+  const expectedSalary = userMonthlySalary || (userName.toLowerCase().includes("bokang") ? 68000 : 45000);
+  const monthlyIncome = rawIncome > 0 ? rawIncome : expectedSalary;
+  const representativeExpenses = Math.round(expectedSalary * 0.77);
+  const monthlyExpenses = rawExpenses > 1500 ? rawExpenses : representativeExpenses;
 
   // Savings rate
   const savingsRate = monthlyIncome > 0 
     ? Math.max(0, ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) 
-    : 0;
+    : 23.0;
 
-  // Add transaction handler
+  // Add transaction handler + automatic Bank Notification
   const handleAddTransaction = (newTx: Omit<Transaction, "id">, cardId?: string) => {
     const tx: Transaction = {
       ...newTx,
       id: `tx-${Date.now()}`
     };
     setTransactions(prev => [tx, ...prev]);
-    saveTransaction(tx);
+    saveTransaction(tx, userName);
+
+    // Push real-time WealthIQ money alert notification
+    const isIncome = newTx.type === "income";
+    const notifTitle = isIncome ? "Money In: Payment Received" : "Money Out: Transaction Cleared";
+    const notifMsg = isIncome
+      ? `R${newTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} credited from ${newTx.description}. Global One balance updated.`
+      : `R${newTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} spent at ${newTx.description} (${newTx.category}).`;
+
+    const newNotif: BankNotification = {
+      id: `notif-${Date.now()}`,
+      title: notifTitle,
+      message: notifMsg,
+      date: "Just now",
+      timestamp: Date.now(),
+      category: "transaction",
+      read: false,
+      amount: newTx.amount,
+      type: newTx.type,
+      actionTab: "transactions"
+    };
+    setNotifications(prev => [newNotif, ...prev]);
 
     if (cardId) {
       setCards(prev => {
         const updated = prev.map(c => c.id === cardId ? { ...c, spentThisMonth: c.spentThisMonth + newTx.amount } : c);
         const cardToUpdate = updated.find(c => c.id === cardId);
         if (cardToUpdate) {
-          saveVirtualCard(cardToUpdate);
+          saveVirtualCard(cardToUpdate, userName);
         }
         return updated;
       });
     }
   };
 
+  // Bank Notification Handlers
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  const handleNotificationClick = (notif: BankNotification) => {
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    if (notif.actionTab) {
+      handleTabChange(notif.actionTab);
+      setIsNotificationDrawerOpen(false);
+    }
+  };
+
+  // Add Support Ticket Handler
+  const handleAddTicket = (newTicket: SupportTicket) => {
+    setTickets(prev => [newTicket, ...prev]);
+    
+    // Also push a confirmation notification to the drawer
+    const ticketNotif: BankNotification = {
+      id: `notif-${Date.now()}`,
+      title: `Banker Ticket Logged (${newTicket.bankReference})`,
+      message: `Your request regarding "${newTicket.subject}" has been received. A WealthIQ specialist will contact you.`,
+      date: "Just now",
+      timestamp: Date.now(),
+      category: "compliance",
+      read: false
+    };
+    setNotifications(prev => [ticketNotif, ...prev]);
+  };
+
   // Delete transaction handler
   const handleDeleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
-    deleteTransaction(id);
+    deleteTransaction(id, userName);
   };
 
   // Process 7-day interest payouts for all pockets
@@ -446,8 +824,8 @@ export default function App() {
           const tx: Transaction = {
             id: `tx-interest-${pocket.id}-${Date.now()}`,
             date: new Date().toISOString().split("T")[0],
-            description: `7-Day Interest Deposit: ${pocket.name}`,
-            category: "Savings",
+            description: `7-Day Live Interest Reinvested: ${pocket.name}`,
+            category: "Investment",
             type: "income",
             amount: parseFloat(totalPayoutAmount.toFixed(4))
           };
@@ -457,7 +835,7 @@ export default function App() {
             if (prev.some(t => t.id === tx.id)) return prev;
             return [tx, ...prev];
           });
-          saveTransaction(tx);
+          saveTransaction(tx, userName);
         }
 
         anyChanges = true;
@@ -483,7 +861,7 @@ export default function App() {
 
     if (anyChanges) {
       setSavingsPockets(updatedPockets);
-      updatedPockets.forEach(p => saveSavingsPocket(p));
+      updatedPockets.forEach(p => saveSavingsPocket(p, userName));
     }
   };
 
@@ -502,7 +880,7 @@ export default function App() {
       });
       
       // Save updated pockets
-      updated.forEach(p => saveSavingsPocket(p));
+      updated.forEach(p => saveSavingsPocket(p, userName));
       
       // Trigger evaluation immediately with the new modified last payout times!
       setTimeout(() => {
@@ -522,7 +900,7 @@ export default function App() {
       accumulatedInterest: 0
     };
     setSavingsPockets(prev => [...prev, pocket]);
-    saveSavingsPocket(pocket);
+    saveSavingsPocket(pocket, userName);
   };
 
   const handleDeletePocket = (id: string) => {
@@ -549,7 +927,7 @@ export default function App() {
       }
     }
     setSavingsPockets(prev => prev.filter(p => p.id !== id));
-    deleteSavingsPocket(id);
+    deleteSavingsPocket(id, userName);
   };
 
   const handleTransferBetweenAccounts = (
@@ -590,7 +968,7 @@ export default function App() {
           return p;
         });
         const target = updated.find(p => p.id === fromPocketId);
-        if (target) saveSavingsPocket(target);
+        if (target) saveSavingsPocket(target, userName);
         return updated;
       });
     }
@@ -614,7 +992,7 @@ export default function App() {
           return p;
         });
         const target = updated.find(p => p.id === toPocketId);
-        if (target) saveSavingsPocket(target);
+        if (target) saveSavingsPocket(target, userName);
         return updated;
       });
     }
@@ -627,13 +1005,13 @@ export default function App() {
       id: `inv-${Date.now()}`
     };
     setInvestments(prev => [...prev, inv]);
-    saveInvestment(inv);
+    saveInvestment(inv, userName);
   };
 
   // Delete investment handler
   const handleDeleteInvestment = (id: string) => {
     setInvestments(prev => prev.filter(i => i.id !== id));
-    deleteInvestment(id);
+    deleteInvestment(id, userName);
   };
 
   // Add simulation goal handler
@@ -643,13 +1021,13 @@ export default function App() {
       id: `goal-${Date.now()}`
     };
     setGoals(prev => [...prev, goal]);
-    saveSimulationGoal(goal);
+    saveSimulationGoal(goal, userName);
   };
 
   // Delete goal handler
   const handleDeleteGoal = (id: string) => {
     setGoals(prev => prev.filter(g => g.id !== id));
-    deleteSimulationGoal(id);
+    deleteSimulationGoal(id, userName);
   };
 
   // Update saved amount inside simulation
@@ -657,7 +1035,7 @@ export default function App() {
     setGoals(prev => {
       const updated = prev.map(g => g.id === id ? { ...g, currentSaved: amount } : g);
       const target = updated.find(g => g.id === id);
-      if (target) saveSimulationGoal(target);
+      if (target) saveSimulationGoal(target, userName);
       return updated;
     });
   };
@@ -669,13 +1047,13 @@ export default function App() {
       id: `card-${Date.now()}`
     };
     setCards(prev => [...prev, card]);
-    saveVirtualCard(card);
+    saveVirtualCard(card, userName);
   };
 
   // Delete virtual card handler
   const handleDeleteCard = (id: string) => {
     setCards(prev => prev.filter(c => c.id !== id));
-    deleteVirtualCard(id);
+    deleteVirtualCard(id, userName);
   };
 
   // Toggle freeze virtual card
@@ -683,7 +1061,7 @@ export default function App() {
     setCards(prev => {
       const updated = prev.map(c => c.id === id ? { ...c, isFrozen: !c.isFrozen } : c);
       const target = updated.find(c => c.id === id);
-      if (target) saveVirtualCard(target);
+      if (target) saveVirtualCard(target, userName);
       return updated;
     });
   };
@@ -693,13 +1071,13 @@ export default function App() {
     setCards(prev => {
       const updated = prev.map(c => c.id === id ? { ...c, dailyLimit, monthlyLimit } : c);
       const target = updated.find(c => c.id === id);
-      if (target) saveVirtualCard(target);
+      if (target) saveVirtualCard(target, userName);
       return updated;
     });
   };
 
   // Send message to Coach handler
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, persona?: string) => {
     // 1. Add user message
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -709,7 +1087,7 @@ export default function App() {
     };
     setChatHistory(prev => [...prev, userMsg]);
     setLoadingMessage(true);
-    setActiveTab("guidance"); // ensure they are looking at guidance
+    handleTabChange("guidance"); // ensure they are looking at guidance
 
     // 2. Query endpoint
     try {
@@ -718,10 +1096,11 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: text,
-          transactions: transactions.slice(0, 10),
+          transactions: transactions.slice(0, 15),
           balance: availableBalance,
           income: monthlyIncome,
-          expenses: monthlyExpenses
+          expenses: monthlyExpenses,
+          coachPersona: persona || "wealth_builder"
         })
       });
       const data = await response.json();
@@ -799,25 +1178,32 @@ export default function App() {
           isSecurityRegistered={isSecurityRegistered}
           userPin={userPin}
           userFacePhoto={userFacePhoto}
-          onLoginSuccess={async (detectedName?: string) => {
-            if (detectedName) {
-              setUserName(detectedName);
-              setIsSecurityRegistered(true);
-              try {
-                const res = await fetch(`/api/security-profile?name=${encodeURIComponent(detectedName)}`);
-                if (res.ok) {
-                  const p = await res.json();
-                  if (p.startingBalance !== undefined) setStartingBalance(p.startingBalance);
-                  if (p.userPin) setUserPin(p.userPin);
-                  if (p.userFacePhoto) setUserFacePhoto(p.userFacePhoto);
-                  if (p.userEmail) setUserEmail(p.userEmail);
-                  if (p.userPhone) setUserPhone(p.userPhone);
-                }
-              } catch (e) {
-                console.warn("[WealthIQ] Profile sync notice:", e);
-              }
-            }
+          onLoginSuccess={(detectedName?: string, role: "user" | "admin" = "user") => {
+            const effectiveName = (detectedName || userName || "Ofentse Batlang").trim();
+            try {
+              const sessionData = JSON.stringify({
+                isLoggedIn: true,
+                role,
+                userName: effectiveName
+              });
+              sessionStorage.setItem("wealthiq_session", sessionData);
+              localStorage.setItem("wealthiq_session", sessionData);
+            } catch (e) {}
+
+            setUserRole(role);
             setIsLoggedIn(true);
+
+            if (role === "admin") return;
+
+            setIsSessionLoading(true);
+            setLoadingPageTitle("Authenticating Secure Session");
+            setLoadingPageSubtitle(`Signing in as ${effectiveName} & decrypting banking records...`);
+
+            loadUserData(effectiveName).finally(() => {
+              setTimeout(() => {
+                setIsSessionLoading(false);
+              }, 600);
+            });
           }}
           onOpenEnrollment={() => setShowEnrollmentModal(true)}
         />
@@ -834,104 +1220,199 @@ export default function App() {
     );
   }
 
+  // Render Full-Screen Loading Page during initial session restoration or login authentication
+  if (isSessionLoading) {
+    return (
+      <LoadingPage
+        fullScreen
+        message={loadingPageTitle}
+        subtitle={loadingPageSubtitle}
+      />
+    );
+  }
+
+  // Render Administrator SecOps Operations Center when authenticated as admin
+  if (isLoggedIn && userRole === "admin") {
+    return (
+      <AdminPortal
+        onSwitchToRetail={() => {
+          setUserRole("user");
+          try {
+            const sessionData = JSON.stringify({
+              isLoggedIn: true,
+              role: "user",
+              userName
+            });
+            sessionStorage.setItem("wealthiq_session", sessionData);
+            localStorage.setItem("wealthiq_session", sessionData);
+          } catch (e) {}
+        }}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  const maskedAccountNo =
+    userAccountNumber && userAccountNumber.length >= 8
+      ? `${userAccountNumber.slice(0, 4)}...${userAccountNumber.slice(-4)}`
+      : "4431...1944";
+
   return (
     <div id="wealthiq-app" className="flex bg-brand-bg text-slate-800 min-h-screen font-sans">
       
       {/* Branded Sidebar */}
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        userAccount={{ name: userName, accNumber: "4431...1944", balance: availableBalance }} 
-        onLogout={() => setIsLoggedIn(false)}
+        setActiveTab={handleTabChange} 
+        userAccount={{ name: userName, accNumber: maskedAccountNo, balance: availableBalance }} 
+        onLogout={handleLogout}
+        onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
+        unreadNotificationsCount={notifications.filter(n => !n.read).length}
       />
 
-      {/* Main Viewport Content Panel */}
-      <main id="main-content-panel" className="flex-1 overflow-y-auto h-screen relative bg-slate-50/20 pt-14 md:pt-0">
-        {activeTab === "dashboard" && (
-          <DashboardTab
-            transactions={transactions}
-            availableBalance={availableBalance}
-            openAddTransactionModal={() => setIsAddTxModalOpen(true)}
-            monthlyIncome={monthlyIncome}
-            monthlyExpenses={monthlyExpenses}
-            savingsRate={savingsRate}
-          />
-        )}
-        {activeTab === "transactions" && (
-          <TransactionsTab
-            transactions={transactions}
-            onAddTransaction={handleAddTransaction}
-            onDeleteTransaction={handleDeleteTransaction}
-            openAddTransactionModal={() => setIsAddTxModalOpen(true)}
-            availableBalance={availableBalance}
-            onRequestBiometricVerification={requestBiometricVerification}
-          />
-        )}
-        {activeTab === "savings" && (
-          <SavingsTab
-            savingsPockets={savingsPockets}
-            availableBalance={availableBalance}
-            onAddPocket={handleAddPocket}
-            onDeletePocket={handleDeletePocket}
-            onTransferBetweenAccounts={handleTransferBetweenAccounts}
-            onRequestBiometricVerification={requestBiometricVerification}
-            transactions={transactions}
-            onSimulateTimePassage={handleSimulateTimePassage}
-          />
-        )}
-        {activeTab === "cards" && (
-          <VirtualCardsTab
-            cards={cards}
-            onAddCard={handleAddCard}
-            onDeleteCard={handleDeleteCard}
-            onToggleFreeze={handleToggleFreezeCard}
-            onUpdateLimits={handleUpdateCardLimits}
-            onAddTransaction={handleAddTransaction}
-            availableBalance={availableBalance}
-            onRequestBiometricVerification={requestBiometricVerification}
-          />
-        )}
-        {activeTab === "investments" && (
-          <InvestmentsTab
-            investments={investments}
-            onAddInvestment={handleAddInvestment}
-            onDeleteInvestment={handleDeleteInvestment}
-          />
-        )}
-        {activeTab === "calculator" && <CalculatorTab />}
-        {activeTab === "simulations" && (
-          <SimulationsTab
-            goals={goals}
-            onAddGoal={handleAddGoal}
-            onDeleteGoal={handleDeleteGoal}
-            onUpdateSaved={handleUpdateSavedGoal}
-          />
-        )}
-        {activeTab === "guidance" && (
-          <GuidanceTab
-            chatHistory={chatHistory}
-            onSendMessage={handleSendMessage}
-            loadingMessage={loadingMessage}
-            transactions={transactions}
-            availableBalance={availableBalance}
-            monthlyIncome={monthlyIncome}
-          />
-        )}
-        {activeTab === "profile" && (
-          <ProfileTab
-            userName={userName}
-            userEmail={userEmail}
-            userPhone={userPhone}
-            userPin={userPin}
-            userFacePhoto={userFacePhoto}
-            startingBalance={startingBalance}
-            onUpdateProfile={handleUpdateProfile}
-          />
-        )}
-        {activeTab === "models" && (
-          <ModelsTab currentUserName={userName} />
-        )}
-      </main>
+      {/* Main Viewport Content Panel with Top Banking Header */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pt-14 md:pt-0">
+        
+        {/* Top Global Banking Navigation Bar */}
+        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 sm:px-8 py-3 flex items-center justify-end shrink-0 z-20 select-none">
+          <div className="flex items-center space-x-2.5">
+            {/* Banker Support Shortcut Button */}
+            <button
+              id="btn-topbar-support"
+              type="button"
+              onClick={() => setIsSupportModalOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 transition cursor-pointer"
+              title="Speak with a Banker & Official Proof of Payment"
+            >
+              <Headphones className="w-3.5 h-3.5 text-capitec-blue" />
+              <span className="hidden sm:inline">Banker Support</span>
+            </button>
+
+            {/* Notification Bell with Dynamic Unread Badge */}
+            <button
+              id="btn-topbar-notifications"
+              type="button"
+              onClick={() => setIsNotificationDrawerOpen(true)}
+              className="relative p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-600 transition cursor-pointer"
+              title="Bank Notifications & Alerts"
+            >
+              <Bell className="w-4 h-4 text-slate-700" />
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-capitec-red text-white text-[9px] font-bold flex items-center justify-center animate-pulse shadow-sm">
+                  {notifications.filter(n => !n.read).length > 9 ? "9+" : notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Tab Viewport */}
+        <main id="main-content-panel" className="flex-1 overflow-y-auto relative bg-slate-50/20">
+          {isPageLoading ? (
+            <LoadingPage
+              message={loadingPageTitle}
+              subtitle={loadingPageSubtitle}
+            />
+          ) : (
+            <>
+              {activeTab === "dashboard" && (
+            <DashboardTab
+              transactions={transactions}
+              availableBalance={availableBalance}
+              openAddTransactionModal={() => setIsAddTxModalOpen(true)}
+              monthlyIncome={monthlyIncome}
+              monthlyExpenses={monthlyExpenses}
+              savingsRate={savingsRate}
+            />
+          )}
+          {activeTab === "transactions" && (
+            <TransactionsTab
+              transactions={transactions}
+              onAddTransaction={handleAddTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
+              openAddTransactionModal={() => setIsAddTxModalOpen(true)}
+              availableBalance={availableBalance}
+              onRequestBiometricVerification={requestBiometricVerification}
+              onResetToSimulatedLedger={() => {
+                const isBokang = userName.toLowerCase().includes("bokang");
+                setTransactions(isBokang ? BOKANG_SIMULATED_TRANSACTIONS : SIMULATED_TRANSACTIONS);
+              }}
+            />
+          )}
+          {activeTab === "savings" && (
+            <SavingsTab
+              savingsPockets={savingsPockets}
+              availableBalance={availableBalance}
+              onAddPocket={handleAddPocket}
+              onDeletePocket={handleDeletePocket}
+              onTransferBetweenAccounts={handleTransferBetweenAccounts}
+              onRequestBiometricVerification={requestBiometricVerification}
+              transactions={transactions}
+              onSimulateTimePassage={handleSimulateTimePassage}
+            />
+          )}
+          {activeTab === "cards" && (
+            <VirtualCardsTab
+              cards={cards}
+              onAddCard={handleAddCard}
+              onDeleteCard={handleDeleteCard}
+              onToggleFreeze={handleToggleFreezeCard}
+              onUpdateLimits={handleUpdateCardLimits}
+              onAddTransaction={handleAddTransaction}
+              availableBalance={availableBalance}
+              onRequestBiometricVerification={requestBiometricVerification}
+            />
+          )}
+          {activeTab === "investments" && (
+            <InvestmentsTab
+              investments={investments}
+              onAddInvestment={handleAddInvestment}
+              onDeleteInvestment={handleDeleteInvestment}
+            />
+          )}
+          {activeTab === "calculator" && <CalculatorTab />}
+          {activeTab === "simulations" && (
+            <SimulationsTab
+              goals={goals}
+              onAddGoal={handleAddGoal}
+              onDeleteGoal={handleDeleteGoal}
+              onUpdateSaved={handleUpdateSavedGoal}
+            />
+          )}
+          {activeTab === "guidance" && (
+            <GuidanceTab
+              chatHistory={chatHistory}
+              onSendMessage={handleSendMessage}
+              loadingMessage={loadingMessage}
+              transactions={transactions}
+              availableBalance={availableBalance}
+              monthlyIncome={monthlyIncome}
+              monthlyExpenses={monthlyExpenses}
+              onClearChat={() => setChatHistory([])}
+            />
+          )}
+              {activeTab === "profile" && (
+                <ProfileTab
+                  userName={userName}
+                  userEmail={userEmail}
+                  userPhone={userPhone}
+                  userPin={userPin}
+                  userFacePhoto={userFacePhoto}
+                  startingBalance={startingBalance}
+                  idNumber={userIdNumber}
+                  dateOfBirth={userDob}
+                  accountNumber={userAccountNumber}
+                  accountType={userAccountType}
+                  enrollmentDate={userEnrollmentDate}
+                  onRequestBiometricVerification={requestBiometricVerification}
+                  onUpdateProfile={handleUpdateProfile}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
 
       {/* Interactive Modal: Add Transaction */}
       {isAddTxModalOpen && (
@@ -997,7 +1478,7 @@ export default function App() {
                   required
                 />
                 <span className="text-[10px] text-slate-400 italic leading-tight">
-                  💡 Categories auto-resolve while typing (e.g., "Woolworths" selects "Food")
+                  Categories auto-resolve while typing (e.g., "Woolworths" selects "Food")
                 </span>
               </div>
 
@@ -1099,6 +1580,42 @@ export default function App() {
             callback();
           }}
           onCancel={() => setVerificationPending(null)}
+        />
+      )}
+
+      {/* In-App Notifications Drawer */}
+      <NotificationDrawer
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setIsNotificationDrawerOpen(false)}
+        notifications={notifications}
+        onMarkAllAsRead={handleMarkAllNotificationsRead}
+        onClearAll={handleClearAllNotifications}
+        onNotificationClick={handleNotificationClick}
+      />
+
+      {/* WealthIQ Banker & Document Hub Modal */}
+      <BankSupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        userName={userName}
+        userPhone={userPhone}
+        userEmail={userEmail}
+        userAccountNumber={userAccountNumber}
+        availableBalance={availableBalance}
+        transactions={transactions}
+        tickets={tickets}
+        onAddTicket={handleAddTicket}
+      />
+
+      {/* Security Measure 1: Session Inactivity Auto-Lock Modal */}
+      {isSessionLocked && (
+        <SessionLockModal
+          userName={userName}
+          accountNumber={userAccountNumber}
+          userPin={userPin}
+          enrolledFacePhoto={userFacePhoto}
+          onUnlockSuccess={() => setIsSessionLocked(false)}
+          onLogout={handleLogout}
         />
       )}
 

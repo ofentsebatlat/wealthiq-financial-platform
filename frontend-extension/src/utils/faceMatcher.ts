@@ -27,7 +27,7 @@ export interface UserVerificationResult {
 function localCanvasFallback(photoA: string, photoB: string): number {
   if (!photoA || !photoB) return 0;
   if (photoA.trim() === photoB.trim()) return 99.8;
-  return 82.5; // Neutral safe fallback similarity for local tests
+  return 0;
 }
 
 /**
@@ -357,22 +357,133 @@ export async function validateFaceForEnrollment(
   };
 }
 
+export interface FaceBoundingBox {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface FaceTrackResult {
+  faceDetected: boolean;
+  facesCount: number;
+  inPlace: boolean;
+  status:
+    | "no_face"
+    | "multiple_faces"
+    | "too_dark"
+    | "glare"
+    | "too_far"
+    | "too_close"
+    | "off_center"
+    | "blurry"
+    | "no_landmarks"
+    | "in_place"
+    | "offline";
+  lighting: "dim" | "harsh" | "good";
+  distanceStatus: "none" | "too_far" | "too_close" | "good";
+  brightness?: number;
+  box: FaceBoundingBox | null;
+  identified: boolean;
+  username: string | null;
+  distance?: number;
+  similarity?: number;
+  coachingHint?: string | null;
+  advice: string;
+  liveness?: {
+    isLive: boolean;
+    blinkDetected: boolean;
+    blinkCount?: number;
+    ear: number;
+    liveTexture: boolean;
+  };
+}
+
+/**
+ * Tracks a live camera frame for face placement, distance, lighting, centering,
+ * and strict Euclidean biometric matching (matching submit-5b6d638a-3059-4128-a8f1-8fc2c40ebc38).
+ */
+export async function trackLiveFaceFrame(
+  photoB64: string,
+  mode: "verify" | "enroll" = "verify",
+  targetUsername?: string
+): Promise<FaceTrackResult> {
+  try {
+    const res = await fetch("/api/face/track-frame", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        photo_b64: photoB64,
+        mode,
+        target_username: targetUsername || undefined
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        faceDetected: Boolean(data.face_detected),
+        facesCount: typeof data.faces_count === "number" ? data.faces_count : 0,
+        inPlace: Boolean(data.in_place),
+        status: data.status || "no_face",
+        lighting: data.lighting || "good",
+        distanceStatus: data.distance_status || "none",
+        brightness: data.brightness,
+        box: data.box || null,
+        identified: Boolean(data.identified),
+        username: data.username || null,
+        distance: data.distance,
+        similarity: data.similarity,
+        coachingHint: data.coaching_hint || null,
+        advice: data.advice || "Position your face inside the frame.",
+        liveness: data.liveness ? {
+          isLive: Boolean(data.liveness.is_live),
+          blinkDetected: Boolean(data.liveness.blink_detected),
+          ear: typeof data.liveness.ear === "number" ? data.liveness.ear : 0.3,
+          liveTexture: Boolean(data.liveness.live_texture)
+        } : undefined
+      };
+    }
+  } catch (err) {
+    console.warn("[FaceMatcher] trackLiveFaceFrame notice:", err);
+  }
+
+  return {
+    faceDetected: false,
+    facesCount: 0,
+    inPlace: false,
+    status: "offline",
+    lighting: "good",
+    distanceStatus: "none",
+    box: null,
+    identified: false,
+    username: null,
+    advice: "Connecting to biometric face tracker..."
+  };
+}
+
 /**
  * Enrolls a user's face encodings and PIN into the biometric model database
  */
 export async function enrollBiometricUser(
   username: string,
   pin: string,
-  photoB64: string
+  photoB64: string,
+  extraPhotos?: string[]
 ): Promise<{ success: boolean; message: string; encodingsCount?: number }> {
   try {
+    const allPhotos = extraPhotos && extraPhotos.length > 0
+      ? Array.from(new Set([photoB64, ...extraPhotos]))
+      : [photoB64];
+
     const res = await fetch("/api/face/enroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username,
         pin,
-        photo_b64: photoB64
+        photo_b64: photoB64,
+        photos_b64: allPhotos
       })
     });
 

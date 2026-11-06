@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart TD
+    subgraph Client_Tier [Client Presentation Tier - React 18 / Vite]
+        UI[WealthIQ Single Page Application]
+        Cam[Webcam Video Capture Stream]
+        LockoutModal[Session Auto-Lock & Brute-Force Modal]
+        Charts[Chart.js Financial Visualizations]
+    end
+
+    subgraph Gateway_Tier [Application & Security Gateway - Node.js / Express]
+        API[Express REST API Gateway]
+        AuthCtrl[Authentication & Session Controller]
+        SecOps[SecOps Intrusion & Lockout Monitor]
+        LedgerCtrl[Transaction & Aggregation Engine]
+        CardCtrl[Virtual Card Management Service]
+        SavingsCtrl[Multi-Pocket Savings Engine]
+    end
+
+    subgraph AI_CV_Tier [AI & Computer Vision Processing Tier]
+        CVService[Python 3.12 Flask CV Engine]
+        LandmarkDet[68-Point Facial Landmark Detector]
+        EARModule[Eye Aspect Ratio 3D Liveness Analyzer]
+        EmbeddingEngine[128D Deep Feature Vector Extractor]
+        GeminiAPI[Google Gemini 1.5/2.0 Financial Coach API]
+    end
+
+    subgraph Data_Tier [Data Storage & External Services]
+        DocStore[(ACID Document Store - JSON Ledgers)]
+        SMTP[Nodemailer TLS/SSL Mail Relay]
+    end
+
+    UI -->|HTTP / JSON REST Requests| API
+    Cam -->|Base64 JPEG Frames| API
+    API -->|Proxy Frame Payloads| CVService
+    CVService --> LandmarkDet
+    LandmarkDet --> EARModule
+    EARModule --> EmbeddingEngine
+    EmbeddingEngine -->|Biometric Match Score & Liveness Boolean| CVService
+    CVService -->|Verification Status| API
+
+    API --> AuthCtrl
+    AuthCtrl --> SecOps
+    API --> LedgerCtrl
+    API --> CardCtrl
+    API --> SavingsCtrl
+
+    LedgerCtrl -->|Read / Write Transactions & Ledgers| DocStore
+    AuthCtrl -->|Persist Auth Logs & PIN Lockout States| DocStore
+    LedgerCtrl -->|Contextual Cash-Flow Payload| GeminiAPI
+    GeminiAPI -->|Grounded Financial Advice| LedgerCtrl
+    AuthCtrl -->|Dispatch 6-Digit Verification OTP| SMTP
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

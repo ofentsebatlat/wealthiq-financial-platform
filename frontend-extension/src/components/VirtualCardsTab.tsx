@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { 
   CreditCard, 
   Eye, 
@@ -14,7 +14,8 @@ import {
   ShoppingBag,
   Sparkles,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  Check
 } from "lucide-react";
 import { VirtualCard, Transaction } from "../types";
 
@@ -94,8 +95,25 @@ export default function VirtualCardsTab({
     // Since id isn't returned synchronously here, we let the list update.
   };
 
+  // Auto-hide sensitive CVV & card details after 45s of being revealed
+  useEffect(() => {
+    if (!revealDetails) return;
+    const hideTimer = setTimeout(() => {
+      setRevealDetails(false);
+    }, 45000);
+    return () => clearTimeout(hideTimer);
+  }, [revealDetails]);
+
   const handleCopyCardNumber = () => {
     if (!selectedCard) return;
+    if (!revealDetails) {
+      onRequestBiometricVerification("Authorize Card Number Copy", () => {
+        navigator.clipboard.writeText(selectedCard.cardNumber.replace(/\s/g, ""));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+      return;
+    }
     navigator.clipboard.writeText(selectedCard.cardNumber.replace(/\s/g, ""));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -225,7 +243,7 @@ export default function VirtualCardsTab({
           className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-6 animate-fadeIn"
         >
           <h3 className="text-base font-bold text-slate-800 md:col-span-4 pb-2 border-b border-slate-100">
-            Issue New Capitec Virtual Card
+            Issue New WealthIQ Virtual Card
           </h3>
 
           {/* Card Type */}
@@ -263,7 +281,7 @@ export default function VirtualCardsTab({
                   }`}
                   title={`${colorOpt.key} theme`}
                 >
-                  {cardColor === colorOpt.key && "✓"}
+                  {cardColor === colorOpt.key && <Check className="w-3.5 h-3.5" />}
                 </button>
               ))}
             </div>
@@ -382,7 +400,7 @@ export default function VirtualCardsTab({
                 <ShieldAlert className="w-4.5 h-4.5 text-capitec-blue shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-800 block mb-0.5">Advanced Fraud Protection</span>
-                  <span>Capitec virtual cards use unique tokenization. In case of phishing or vendor leaks, delete the compromised card and issue a fresh one immediately without affecting your main debit card!</span>
+                  <span>WealthIQ virtual cards use unique tokenization. In case of phishing or vendor leaks, delete the compromised card and issue a fresh one immediately without affecting your main debit card!</span>
                 </div>
               </div>
             </div>
@@ -414,7 +432,7 @@ export default function VirtualCardsTab({
                     <div className="flex justify-between items-start z-5">
                       <div>
                         <span className="text-[10px] font-bold tracking-widest opacity-80 uppercase block">
-                          CAPITEC
+                          WEALTHIQ
                         </span>
                         <span className="text-xs font-semibold tracking-wide text-slate-100/95 font-sans">
                           {selectedCard.type}

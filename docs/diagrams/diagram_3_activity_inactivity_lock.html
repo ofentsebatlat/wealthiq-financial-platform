@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart TD
+    Start([User Authenticated & Active]) --> TimerInit[Initialize 120s Inactivity Timer]
+    TimerInit --> DetectAction{User Action Detected?}
+
+    DetectAction -- Yes: Mouse / Key / Touch --> ResetTimer[Reset Inactivity Timer to 0s]
+    ResetTimer --> DetectAction
+
+    DetectAction -- No: 120s Elapsed --> EngageLock[Engage SessionLockModal Overlay]
+    EngageLock --> MaskUI[Conceal Balances & Disable Underlying Routes]
+    MaskUI --> UserChoice{Select Unlock Method}
+
+    UserChoice -- Remote PIN --> InputPIN[Enter 4-Digit PIN on Numeric Keypad]
+    InputPIN --> ValidatePIN{PIN Valid & < 3 Strikes?}
+    ValidatePIN -- Valid --> DismissModal[Dismiss Overlay & Resume Session State]
+    DismissModal --> TimerInit
+
+    ValidatePIN -- Invalid: Strikes < 3 --> WarnUser[Show Remaining Attempts Banner]
+    WarnUser --> InputPIN
+
+    ValidatePIN -- Invalid: 3rd Strike --> LockoutState[Engage 15-Min Security Freeze & Alert SecOps]
+    LockoutState --> OTPPrompt[Prompt for Email OTP Verification]
+
+    UserChoice -- Face ID --> OpenCam[Activate Webcam Stream]
+    OpenCam --> BlinkScan[Detect 68 Landmarks & Check Eye Blink EAR < 0.22]
+    BlinkScan --> MatchFace{Liveness Passed & d <= 0.60?}
+    MatchFace -- Success --> DismissModal
+    MatchFace -- Failed --> FaceError[Display Biometric Mismatch & Prompt PIN]
+    FaceError --> InputPIN
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

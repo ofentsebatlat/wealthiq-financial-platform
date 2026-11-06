@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+flowchart LR
+    subgraph Actors
+        Client([Retail Banking Client])
+        Admin([SecOps Administrator])
+        System([Autonomous System Engine])
+    end
+
+    subgraph Authentication_Security [Authentication & Security Management]
+        UC01(UC01: Remote PIN Auth)
+        UC02(UC02: Facial Biometric Auth)
+        UC03(UC03: Inactivity Auto-Lock)
+        UC04(UC04: Brute-Force Freeze)
+        UC05(UC05: Email OTP Reset)
+        UC10(UC10: Step-Up Auth)
+        UC15(UC15: Audit SecOps Logs)
+    end
+
+    subgraph Financial_Operations [Core Financial Operations]
+        UC06(UC06: View Dashboard)
+        UC07(UC07: Manage Ledger)
+        UC08(UC08: Savings Pockets)
+        UC09(UC09: Manage Virtual Cards)
+    end
+
+    subgraph Modeling_AI [Wealth Modeling & Advisory]
+        UC11(UC11: Investment Portfolio)
+        UC12(UC12: Compound Calculator)
+        UC13(UC13: Goal Modeler)
+        UC14(UC14: AI Financial Coach)
+    end
+
+    Client --> UC01
+    Client --> UC02
+    Client --> UC05
+    Client --> UC06
+    Client --> UC07
+    Client --> UC08
+    Client --> UC09
+    Client --> UC11
+    Client --> UC12
+    Client --> UC13
+    Client --> UC14
+
+    System --> UC03
+    System --> UC04
+    System --> UC10
+
+    Admin --> UC15
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

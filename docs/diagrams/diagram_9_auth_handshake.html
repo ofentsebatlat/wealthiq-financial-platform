@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as Client Browser
+    participant API as Express Gateway
+    participant Auth as Auth Controller
+    participant DB as Persistence Store
+
+    User->>API: POST /api/auth/login { accountNumber, pin }
+    API->>Auth: Validate Input Schema (4 digits)
+    Auth->>DB: Query User Record by AccountNumber
+    DB-->>Auth: User Record { remotePinHash, failedPinAttempts, isLocked, lockedUntil }
+
+    alt Account Currently Frozen (isLocked == true && now < lockedUntil)
+        Auth-->>User: 423 Locked { message: "Account locked. Wait 15 minutes." }
+    else PIN Incorrect
+        Auth->>DB: Increment failedPinAttempts
+        alt failedPinAttempts >= 3
+            Auth->>DB: Set isLocked = true, lockedUntil = now + 15m
+            Auth->>DB: Log High-Severity Intrusion Event (tblBiometricAuthLog)
+            Auth-->>User: 423 Locked { message: "Account locked due to 3 failed attempts." }
+        else failedPinAttempts < 3
+            Auth-->>User: 401 Unauthorized { attemptsLeft: 3 - failedPinAttempts }
+        end
+    else PIN Correct
+        Auth->>DB: Reset failedPinAttempts = 0, isLocked = false
+        Auth->>Auth: Mint Signed JWT Token (exp: 2 hours)
+        Auth->>DB: Log Successful Auth Event
+        Auth-->>User: 200 OK { token: "eyJhbGci...", user: { name, accountId } }
+    end
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>

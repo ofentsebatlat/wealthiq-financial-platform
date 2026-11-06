@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: inline-block;
+        }
+        .mermaid {
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Client as Retail Banking Client
+    participant UI as VirtualCardsTab (React)
+    participant Modal as StepUpModal (React)
+    participant Cam as CircularFaceScanner (Webcam)
+    participant API as Express Gateway (Node.js)
+    participant CV as Python CV Engine (OpenCV/EAR)
+    participant DB as Document Storage (JSON)
+
+    Client->>UI: Clicks "Reveal Info" on Virtual Card
+    UI->>Modal: Mounts StepUpModal (Action: REVEAL_CVV)
+    Modal->>Client: Prompts for Face Biometric Verification
+    Client->>Cam: Positions Face in Front of Webcam
+    Cam->>Cam: Analyzes Frames (Detects Blink: EAR < 0.22)
+    Cam->>API: POST /api/biometrics/verify (Base64 JPEG Frame)
+    API->>CV: Forward Frame to http://127.0.0.1:5001/verify-face
+    CV->>CV: Extract 68 Landmarks & 128D Embedding
+    CV->>DB: Fetch Stored Biometric Template (tblUser)
+    CV->>CV: Calculate Euclidean Distance (d = 0.38 <= 0.60)
+    CV-->>API: 200 OK { matched: true, similarity: 96.2%, liveness: true }
+    API->>DB: Log Successful Step-Up Event (tblBiometricAuthLog)
+    API-->>Modal: 200 OK { stepUpToken: "eyJhbGci..." }
+    Modal-->>UI: Callback onAuthenticated(stepUpToken)
+    UI->>API: GET /api/cards/unmask?cardId=1 (Bearer stepUpToken)
+    API-->>UI: 200 OK { fullPAN: "4431-9012-3456-9445", cvv: "839", expiry: "09/28" }
+    UI->>Client: Renders Unmasked Virtual Card Face (60s Expiry Countdown)
+
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#EEF2FF',
+                primaryBorderColor: '#002060',
+                primaryTextColor: '#0F172A',
+                lineColor: '#1E3A8A',
+                secondaryColor: '#F8FAFC',
+                tertiaryColor: '#FFFFFF'
+            }
+        });
+    </script>
+</body>
+</html>
