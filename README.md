@@ -157,7 +157,7 @@ The application gateway automatically manages and spawns the Python Computer Vis
 
 | Account Role | Identifier / Email | Remote PIN | Capabilities |
 | :--- | :--- | :--- | :--- |
-| **Primary Retail Client** | `ofentsebatlang@gmail.com` | `1234` | Full access to Dashboard, Ledger, Pockets, Virtual Cards, Calculator, Goals, and AI Coach |
+| **Primary Retail Client** | `createaccount@gmail.com` | `1234` | Full access to Dashboard, Ledger, Pockets, Virtual Cards, Calculator, Goals, and AI Coach |
 | **SecOps Master Admin** | `admin.secops@wealthiq.co.za` | `9999` or `0000` | Full administrative control, live intrusion audit logs, brute-force lockout overrides |
 
 ---
