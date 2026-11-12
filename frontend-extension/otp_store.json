@@ -1,0 +1,29 @@
+{
+  "otps": {},
+  "resetTokens": {
+    "decac4b2f8af26bd8f75e7fff867bc943814928e27a458151f1d70367146fcc8": {
+      "tokenHash": "decac4b2f8af26bd8f75e7fff867bc943814928e27a458151f1d70367146fcc8",
+      "email": "ofentsebatlang@gmail.com",
+      "createdAt": 1793966224037,
+      "expiresAt": 1793966824037,
+      "used": true
+    }
+  },
+  "emailRateLog": {
+    "ofentsebatlang@gmail.com": [
+      1793966189163
+    ]
+  },
+  "ipRateLog": {
+    "127.0.0.1": [
+      1793966189163
+    ]
+  },
+  "lastRequestAt": {
+    "ofentsebatlang@gmail.com": 1793966189163,
+    "completely.unregistered.user@gmail.com": 1793915104642,
+    "johndoe@email.com": 1793901729541,
+    "khakhaumoepeng@gmail.com": 1793915074410,
+    "mkbl2579@gmail.com": 1793960401927
+  }
+}

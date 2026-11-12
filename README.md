@@ -88,7 +88,7 @@ WealthIQ is architected as a decoupled, multi-tier service-oriented system:
 
 The complete, unabridged **Final Capstone Project Report** adhering strictly to the **Sol Plaatje University NPRJ740 Template** is published directly within this repository:
 
-- 📄 [**NPRJ740 Final Project Report (Word DOCX)**](docs/NPRJ740_Final_Project_Report_Ofentse_Batlang_202300977_Updated.docx) — *Official SPU layout, high-res original diagrams, live screenshots, MoSCoW matrices, and APA 7th citations.*
+- 📄 [**NPRJ740 Final Project Report — Final Submission (Word DOCX)**](docs/NPRJ740_Final_Project_Report_Ofentse_Batlang_202300977_Final_Submission.docx) — *Official SPU layout, high-res original diagrams, live screenshots, MoSCoW matrices, and APA 7th citations.*
 - 📝 [**NPRJ740 Final Project Report (Markdown Source)**](docs/NPRJ740_Final_Project_Report.md) — *Full text (16,400+ words) covering all 11 required chapters.*
 - 📐 [**System Architecture & Design Diagrams**](docs/diagrams/) — *High-fidelity diagrams including System Context, Use Cases, Workflows 1 & 2, Class Diagrams, ERD, and Deployment Topology.*
 

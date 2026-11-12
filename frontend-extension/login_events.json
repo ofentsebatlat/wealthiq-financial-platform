@@ -1,5 +1,18 @@
 [
   {
+    "id": "evt-1794494461663-8vm1",
+    "timestamp": "2026-11-12T14:41:01.663Z",
+    "userName": "Ofentse Batlang",
+    "accountNumber": "1431289445",
+    "method": "biometric_face",
+    "status": "success",
+    "similarity": 96.8,
+    "distance": 0.28,
+    "device": "WealthIQ Live Webcam Face Tracker",
+    "ipAddress": "196.25.1.42 (Kimberley Central)",
+    "details": "128D Facial Metric Match: Euclidean distance 0.28 <= 0.45 threshold. Identity confirmed as Ofentse Batlang."
+  },
+  {
     "id": "evt-1793966829608-u57r",
     "timestamp": "2026-11-06T12:07:09.608Z",
     "userName": "Ofentse Batlang",
@@ -2261,16 +2274,5 @@
     "device": "WealthIQ Client (Web)",
     "ipAddress": "196.25.1.42 (Kimberley Central)",
     "details": "Authenticated via 4-digit Remote Banking PIN for user Bokang Khakhau."
-  },
-  {
-    "id": "evt-pin-1793895790060",
-    "timestamp": "2026-11-05T16:23:10.060Z",
-    "userName": "Ofentse Batlang",
-    "accountNumber": "1431289445",
-    "method": "pin",
-    "status": "success",
-    "device": "WealthIQ Client (Web)",
-    "ipAddress": "196.25.1.42 (Kimberley Central)",
-    "details": "Authenticated via 4-digit Remote Banking PIN for user Ofentse Batlang."
   }
 ]
