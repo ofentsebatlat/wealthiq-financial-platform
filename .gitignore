@@ -19,6 +19,7 @@ venv/
 # Secrets
 .env
 .env*.local
+.netlify/
 *.log
 .DS_Store
 Thumbs.db
