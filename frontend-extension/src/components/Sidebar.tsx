@@ -14,7 +14,8 @@ import {
   PiggyBank,
   Headphones,
   Bell,
-  Edit2
+  Edit2,
+  BookOpen
 } from "lucide-react";
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ interface SidebarProps {
   onOpenNotifications?: () => void;
   onOpenSupport?: () => void;
   unreadNotificationsCount?: number;
+  onOpenGuide?: () => void;
 }
 
 export default function Sidebar({
@@ -34,7 +36,8 @@ export default function Sidebar({
   onLogout,
   onOpenNotifications,
   onOpenSupport,
-  unreadNotificationsCount = 0
+  unreadNotificationsCount = 0,
+  onOpenGuide
 }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -113,6 +116,21 @@ export default function Sidebar({
             );
           })}
         </nav>
+        {onOpenGuide && (
+          <div className="px-4 pb-2">
+            <button
+              id={`${isMobile ? "mobile" : "desktop"}-btn-guide`}
+              onClick={() => {
+                onOpenGuide();
+                if (isMobile) setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-capitec-blue transition cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4 text-capitec-blue" />
+              <span>App Quick Guide</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* User Profile Block */}

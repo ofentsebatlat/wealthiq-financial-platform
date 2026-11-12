@@ -32,6 +32,7 @@ import NotificationDrawer from "./components/NotificationDrawer";
 import BankSupportModal from "./components/BankSupportModal";
 import LoadingPage from "./components/LoadingPage";
 import SessionLockModal from "./components/SessionLockModal";
+import UserOnboardingGuide from "./components/UserOnboardingGuide";
 import { SIMULATED_TRANSACTIONS, BOKANG_SIMULATED_TRANSACTIONS } from "./data/simulatedTransactions";
 
 // Firebase Sync Utilities
@@ -222,6 +223,7 @@ export default function App() {
   const [tickets, setTickets] = useState<SupportTicket[]>(INITIAL_TICKETS);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
 
   // Authentication & Session state: Restores active authenticated session from sessionStorage if present
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -386,7 +388,7 @@ export default function App() {
         profile = await fetchSecurityProfile(cleanName);
       }
 
-      const userSalary = profile?.monthlySalary || (isBokang ? 68000 : 45000);
+      const userSalary = profile?.monthlySalary || (isOfentse ? 45000 : (isBokang ? 68000 : 0));
       setUserMonthlySalary(userSalary);
 
       if (profile && profile.isSecurityRegistered) {
@@ -409,6 +411,7 @@ export default function App() {
       // 2. Fetch user's isolated transactions
       // Ofentse Batlang seeds with SIMULATED_TRANSACTIONS (R45,000/mo salary)
       // Bokang Khakhau seeds with BOKANG_SIMULATED_TRANSACTIONS (R68,000/mo salary)
+      // Any new or regular account starts with only their real recorded transactions (0 data leakage)
       const txSeeds = isOfentse
         ? SIMULATED_TRANSACTIONS
         : isBokang
@@ -431,6 +434,45 @@ export default function App() {
       setSavingsPockets(pockets || []);
       if (pockets && pockets.length > 0) {
         processInterestPayouts(pockets);
+      }
+
+      // 4. Notifications & Support Tickets data isolation
+      if (isOfentse) {
+        setNotifications(INITIAL_NOTIFICATIONS);
+        setTickets(INITIAL_TICKETS);
+      } else {
+        const notifKey = `wealthiq_notifications_${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+        try {
+          const stored = localStorage.getItem(notifKey);
+          if (stored) {
+            setNotifications(JSON.parse(stored));
+          } else {
+            setNotifications([
+              {
+                id: `notif-welcome-${Date.now()}`,
+                title: "Welcome to WealthIQ",
+                message: "Your Global One account is active. Everything starts fresh from today.",
+                date: "Today",
+                timestamp: Date.now(),
+                category: "security",
+                read: false
+              }
+            ]);
+          }
+        } catch {
+          setNotifications([]);
+        }
+        setTickets([]);
+      }
+
+      // 5. Automatic App Guide for new users (if not dismissed before)
+      if (!isOfentse) {
+        try {
+          const guideSeen = localStorage.getItem(`wealthiq_guide_seen_${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`);
+          if (!guideSeen) {
+            setShowOnboardingGuide(true);
+          }
+        } catch {}
       }
     } catch (err) {
       console.warn("[WealthIQ] Notice loading user data:", err);
@@ -547,12 +589,27 @@ export default function App() {
     setIsSecurityRegistered(true);
     setShowEnrollmentModal(false);
 
-    // Fresh empty collections for newly registered user (no cross-account data copying)
+    // Fresh isolated collections for newly registered user (starts strictly from today with 0 false data)
     setTransactions([]);
     setInvestments([]);
     setGoals([]);
     setCards([]);
     setSavingsPockets([]);
+
+    const welcomeNotif: BankNotification = {
+      id: `notif-welcome-${Date.now()}`,
+      title: "Welcome to WealthIQ",
+      message: `Your Global One account has been created. Starting balance: R${startBalance.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}. Everything starts fresh from today!`,
+      date: "Today",
+      timestamp: Date.now(),
+      category: "security",
+      read: false
+    };
+    setNotifications([welcomeNotif]);
+    setTickets([]);
+
+    // Open the onboarding guide immediately for the newly registered user
+    setShowOnboardingGuide(true);
 
     try {
       sessionStorage.setItem("wealthiq_session", JSON.stringify({
@@ -706,16 +763,29 @@ export default function App() {
     .filter(t => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // If in early month prior to scheduled 25th payday, show scheduled salary and representative commitments
-  const expectedSalary = userMonthlySalary || (userName.toLowerCase().includes("bokang") ? 68000 : 45000);
-  const monthlyIncome = rawIncome > 0 ? rawIncome : expectedSalary;
-  const representativeExpenses = Math.round(expectedSalary * 0.77);
-  const monthlyExpenses = rawExpenses > 1500 ? rawExpenses : representativeExpenses;
+  // For demo/simulated accounts (Ofentse Batlang, Bokang Khakhau), fall back to scheduled demo salary and commitments.
+  // For regular / new users, everything starts strictly from the day of registration: no fake income or expenses!
+  const isDemoAccount = userName.toLowerCase() === "ofentse batlang" || 
+                        userName.toLowerCase() === "ofentse" || 
+                        userName.toLowerCase().includes("bokang");
+
+  const expectedSalary = isDemoAccount 
+    ? (userMonthlySalary || (userName.toLowerCase().includes("bokang") ? 68000 : 45000))
+    : (userMonthlySalary || 0);
+
+  const monthlyIncome = rawIncome > 0 
+    ? rawIncome 
+    : (isDemoAccount ? expectedSalary : 0);
+
+  const representativeExpenses = isDemoAccount ? Math.round(expectedSalary * 0.77) : 0;
+  const monthlyExpenses = rawExpenses > 0 
+    ? rawExpenses 
+    : (isDemoAccount && rawExpenses <= 1500 ? representativeExpenses : 0);
 
   // Savings rate
   const savingsRate = monthlyIncome > 0 
     ? Math.max(0, ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) 
-    : 23.0;
+    : 0;
 
   // Add transaction handler + automatic Bank Notification
   const handleAddTransaction = (newTx: Omit<Transaction, "id">, cardId?: string) => {
@@ -1269,6 +1339,7 @@ export default function App() {
         onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
         onOpenSupport={() => setIsSupportModalOpen(true)}
         unreadNotificationsCount={notifications.filter(n => !n.read).length}
+        onOpenGuide={() => setShowOnboardingGuide(true)}
       />
 
       {/* Main Viewport Content Panel with Top Banking Header */}
@@ -1324,6 +1395,7 @@ export default function App() {
               monthlyIncome={monthlyIncome}
               monthlyExpenses={monthlyExpenses}
               savingsRate={savingsRate}
+              onOpenGuide={() => setShowOnboardingGuide(true)}
             />
           )}
           {activeTab === "transactions" && (
@@ -1618,6 +1690,16 @@ export default function App() {
           onLogout={handleLogout}
         />
       )}
+
+      {/* WealthIQ User Onboarding & Quick Start Guide */}
+      <UserOnboardingGuide
+        isOpen={showOnboardingGuide}
+        onClose={() => setShowOnboardingGuide(false)}
+        userName={userName}
+        startingBalance={startingBalance}
+        onOpenAddTransaction={() => setIsAddTxModalOpen(true)}
+        onNavigateToTab={setActiveTab}
+      />
 
     </div>
   );

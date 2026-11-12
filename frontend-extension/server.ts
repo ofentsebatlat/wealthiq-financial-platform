@@ -269,12 +269,22 @@ async function generateContentWithRetry(params: {
 
 // Helper to generate dynamic, personalized financial insights based on real user analytics
 function generateDynamicFinancialInsights(context: any = {}): string[] {
-  const { transactions = [], balance = 36546.55, income = 45000, expenses = 34650, savingsRate = 23 } = context;
+  const { transactions = [], balance = 0, income = 0, expenses = 0, savingsRate = 0 } = context;
 
-  const balNum = typeof balance === "number" ? balance : 36546.55;
-  const incNum = typeof income === "number" ? income : 45000;
-  const expNum = typeof expenses === "number" ? expenses : 34650;
-  const sRate = typeof savingsRate === "number" ? savingsRate : 23;
+  const balNum = typeof balance === "number" ? balance : 0;
+  const incNum = typeof income === "number" ? income : 0;
+  const expNum = typeof expenses === "number" ? expenses : 0;
+  const sRate = typeof savingsRate === "number" ? savingsRate : 0;
+
+  // If this is a fresh account with no transactions or zero cash flow
+  if (!Array.isArray(transactions) || transactions.length === 0 || (incNum === 0 && expNum === 0)) {
+    return [
+      `Account Clean Slate: Your Global One account is initialized as of today. Record your first deposit or expense to start tracking live telemetry.`,
+      `7-Day Compound Yield: At 8.25% p.a., even unallocated transactional funds earn interest. Move funds to a 32-Day Notice Pocket to maximize return.`,
+      `Liquid Capital Target: Financial advisors recommend maintaining a 3 to 6-month living reserve. As you log transactions, your runway will calculate live.`,
+      `SARS TFSA Exemption: South African tax law allows up to R36,000 annually in Tax-Free Savings Accounts with zero tax on dividends or interest.`
+    ];
+  }
 
   const runwayMonths = (balNum / (expNum || 1)).toFixed(1);
   const sevenDayInterest = ((balNum * 0.0825) * (7 / 365)).toFixed(2);

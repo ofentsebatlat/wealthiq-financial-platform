@@ -16,10 +16,10 @@ import {
   CircleDot,
   BarChart3,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  BookOpen
 } from "lucide-react";
 import { Transaction } from "../types";
-import { SIMULATED_TRANSACTIONS } from "../data/simulatedTransactions";
 
 interface DashboardTabProps {
   transactions: Transaction[];
@@ -28,6 +28,7 @@ interface DashboardTabProps {
   monthlyIncome: number;
   monthlyExpenses: number;
   savingsRate: number;
+  onOpenGuide?: () => void;
 }
 
 export default function DashboardTab({
@@ -36,7 +37,8 @@ export default function DashboardTab({
   openAddTransactionModal,
   monthlyIncome,
   monthlyExpenses,
-  savingsRate
+  savingsRate,
+  onOpenGuide
 }: DashboardTabProps) {
   const [insights, setInsights] = useState<string[]>([]);
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -47,8 +49,20 @@ export default function DashboardTab({
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
   const [hoveredMonthlyIndex, setHoveredMonthlyIndex] = useState<number | null>(null);
 
+  // New user onboarding tips (shown when the user has not yet recorded transactions)
+  const NEW_USER_INSIGHTS = [
+    "Welcome to WealthIQ: Your Global One account is active. Everything starts fresh from today with zero historical data leakage.",
+    "Fund Your Account: Make your first deposit or EFT transfer to establish your liquid emergency reserve and start tracking live cash flow.",
+    "High-Yield Savings: Create a Flexible or 32-Day Notice Savings Pocket to earn up to 8.25% compound interest on your unallocated funds.",
+    "SARS Tax Exemption: Take advantage of your annual R36,000 Tax-Free Savings Account (TFSA) allowance early to maximize tax-free growth."
+  ];
+
   // Fetch insights on load
   const fetchInsights = async () => {
+    if (!transactions || transactions.length === 0) {
+      setInsights(NEW_USER_INSIGHTS);
+      return;
+    }
     setLoadingInsights(true);
     try {
       const response = await fetch("/api/gemini/insights", {
@@ -63,9 +77,10 @@ export default function DashboardTab({
         })
       });
       const data = await response.json();
-      setInsights(data.insights || []);
+      setInsights(data.insights && data.insights.length > 0 ? data.insights : NEW_USER_INSIGHTS);
     } catch (e) {
       console.error("Error loading insights:", e);
+      setInsights(NEW_USER_INSIGHTS);
     } finally {
       setLoadingInsights(false);
     }
@@ -87,9 +102,10 @@ export default function DashboardTab({
     Other: "#94a3b8" // Slate
   };
 
-  // Active transaction set (ensures active transactions or simulated dataset is used)
-  const isSimulatedDataset = !transactions || transactions.length === 0;
-  const activeTransactions = transactions && transactions.length > 0 ? transactions : SIMULATED_TRANSACTIONS;
+  // Active transaction set: Strictly uses the user's isolated transactions
+  // When an account is newly registered, it starts completely fresh from today
+  const activeTransactions = transactions || [];
+  const isNewAccount = activeTransactions.length === 0;
 
   const categorySpending = expenseCategories.map(cat => {
     const total = activeTransactions
@@ -101,42 +117,62 @@ export default function DashboardTab({
   const totalExpenseAllocated = categorySpending.reduce((sum, c) => sum + c.value, 0);
 
   // ----------------------------------------------------
-  // TRANSACTION FLOW LINE GRAPH: EVERY TRANSACTION UP & DOWN (MAY 1 TO NOV 1)
+  // TRANSACTION FLOW LINE GRAPH: EVERY TRANSACTION UP & DOWN
   // ----------------------------------------------------
   const sortedTransactions = [...activeTransactions].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  // Realistic opening balance on May 1 (R14,500 ensures positive checking account balance throughout all 121 transactions, ending at ~R75,435)
   const netTransactionsChange = sortedTransactions.reduce(
     (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
     0
   );
-  const baselineStartBalance = isSimulatedDataset
-    ? 14500
-    : Math.max(10000, availableBalance - netTransactionsChange);
+  const baselineStartBalance = isNewAccount
+    ? availableBalance
+    : Math.max(0, availableBalance - netTransactionsChange);
 
   let currentBal = baselineStartBalance;
   let cumIncomeAcc = 0;
   let cumExpensesAcc = 0;
 
-  const transactionFlowPoints = [
-    {
-      id: "start-baseline",
-      date: "2026-05-01",
-      monthName: "May 2026",
-      description: "Opening Account Balance",
-      category: "Opening",
-      type: "neutral" as const,
-      amount: 0,
-      delta: 0,
-      balance: currentBal,
-      cumIncome: 0,
-      cumExpenses: 0,
-      isSalary: false,
-      isMajor: false
-    },
-    ...sortedTransactions.map(tx => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const firstTxDate = sortedTransactions[0]?.date || todayStr;
+
+  const transactionFlowPoints = sortedTransactions.length === 0
+    ? [
+        {
+          id: "start-baseline",
+          date: todayStr,
+          monthName: new Date().toLocaleDateString("en-ZA", { month: "short", year: "numeric" }),
+          description: "Opening Account Baseline",
+          category: "Opening",
+          type: "neutral" as const,
+          amount: 0,
+          delta: 0,
+          balance: currentBal,
+          cumIncome: 0,
+          cumExpenses: 0,
+          isSalary: false,
+          isMajor: false
+        }
+      ]
+    : [
+        {
+          id: "start-baseline",
+          date: firstTxDate,
+          monthName: new Date(firstTxDate).toLocaleDateString("en-ZA", { month: "short", year: "numeric" }),
+          description: "Opening Account Balance",
+          category: "Opening",
+          type: "neutral" as const,
+          amount: 0,
+          delta: 0,
+          balance: currentBal,
+          cumIncome: 0,
+          cumExpenses: 0,
+          isSalary: false,
+          isMajor: false
+        },
+        ...sortedTransactions.map(tx => {
       const isIncome = tx.type === "income";
       const delta = isIncome ? tx.amount : -tx.amount;
       currentBal += delta;
@@ -383,6 +419,18 @@ export default function DashboardTab({
               R{availableBalance.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
+          {onOpenGuide && (
+            <button
+              id="btn-open-onboarding-guide-header"
+              type="button"
+              onClick={onOpenGuide}
+              className="flex items-center space-x-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-sm px-4 py-2.5 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              title="Open Quick Start Guide"
+            >
+              <BookOpen className="w-4 h-4 text-capitec-blue" />
+              <span className="hidden sm:inline">App Guide</span>
+            </button>
+          )}
           <button
             id="btn-add-transaction-dashboard"
             onClick={openAddTransactionModal}
@@ -642,7 +690,36 @@ export default function DashboardTab({
 
           {/* Interactive SVG Chart Canvas */}
           <div className="h-48 sm:h-52 relative w-full overflow-hidden">
-
+            {isNewAccount ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">New Account — Clean Slate Starting Today</h4>
+                <p className="text-xs text-slate-500 max-w-md mt-1 leading-relaxed">
+                  Your banking ledger begins fresh today. As you receive salary, make transfers, or spend, your live cash flow curves and monthly trendlines will appear here automatically.
+                </p>
+                <div className="flex items-center space-x-3 mt-3">
+                  <button
+                    onClick={openAddTransactionModal}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-capitec-red hover:bg-capitec-red-dark text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Log First Transaction</span>
+                  </button>
+                  {onOpenGuide && (
+                    <button
+                      onClick={onOpenGuide}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-capitec-blue" />
+                      <span>View Quick Guide</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
             {/* VIEW 1: CLUSTERED MONTHLY INFLOW VS OUTFLOW BARS */}
             {chartMode === "monthly" && (
               <svg
@@ -970,12 +1047,19 @@ export default function DashboardTab({
                 })}
               </svg>
             )}
+              </>
+            )}
           </div>
 
           {/* Custom Interactive Legend & Dynamic Stats Footer */}
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
 
-            {chartMode === "monthly" ? (
+            {isNewAccount ? (
+              <div className="flex items-center space-x-2 text-xs text-slate-500 py-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Account ready: Record your first deposit or expense to view live financial telemetry.</span>
+              </div>
+            ) : chartMode === "monthly" ? (
               <>
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <div className="flex items-center space-x-1.5">
@@ -1040,7 +1124,7 @@ export default function DashboardTab({
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-800">Spending Breakdown</h3>
             <span className="text-[10px] px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full font-semibold">
-              May – Nov 2026
+              {isNewAccount ? "Starting Today" : "May – Nov 2026"}
             </span>
           </div>
 
